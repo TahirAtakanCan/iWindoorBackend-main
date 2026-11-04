@@ -14,18 +14,20 @@ public class Accessory {
     private Long id;
 
     @Column(nullable = false)
-    private String name; // Örn: "Beyaz Alüminyum Kol", "EPDM Conta"
+    private String name; // Örn: "Pencere kolu", "EPDM conta"
 
-    @Column(unique = true)
-    private String code; // Stok kodu
+    private String code; // Stok kodu (şirket içinde benzersiz)
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private AccessoryUnit unit; // PIECE veya METER
+    private AccessoryUnit unit; // PIECE, METER, SET
 
     @Column(nullable = false)
-    private BigDecimal price; // Birim fiyatı
+    private BigDecimal price;
 
     @Column(name = "currency")
     private String currency = "TRY";
+
+    @Column(name = "company_id")
+    private Long companyId;
 }

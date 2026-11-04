@@ -1,16 +1,18 @@
 package com.atablood.iWindoor_api.controller;
 
-import com.atablood.iWindoor_api.entity.Glass;
-import com.atablood.iWindoor_api.entity.Profile;
-import com.atablood.iWindoor_api.entity.ProfileType;
-import com.atablood.iWindoor_api.entity.Series;
+import com.atablood.iWindoor_api.dto.catalog.*;
+import com.atablood.iWindoor_api.entity.*;
 import com.atablood.iWindoor_api.service.CatalogService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
+/** Katalog her zaman giriş yapan kullanıcının şirketine aittir. */
 @RestController
 @RequestMapping("/api/v1/catalog")
 @RequiredArgsConstructor
@@ -18,64 +20,79 @@ public class CatalogController {
 
     private final CatalogService catalogService;
 
-    // --- SERİ İŞLEMLERİ ---
+    /** Çevrimdışı çizim için tek paket: seriler (geometri dahil), profiller, camlar, aksesuarlar. */
+    @GetMapping("/snapshot")
+    public CatalogSnapshotDto snapshot(@AuthenticationPrincipal User user) {
+        return catalogService.snapshot(user);
+    }
+
+    // --- SERİ ---
+    @GetMapping("/series")
+    public List<SeriesDto> getAllSeries(@AuthenticationPrincipal User user) {
+        return catalogService.getAllSeries(user).stream().map(SeriesDto::of).toList();
+    }
 
     @PostMapping("/series")
-    public ResponseEntity<Series> createSeries(@RequestBody Series series) {
-        return ResponseEntity.ok(catalogService.createSeries(series));
+    public SeriesDto createSeries(@Valid @RequestBody SeriesRequest request, @AuthenticationPrincipal User user) {
+        return catalogService.createSeries(request, user);
     }
 
-    @GetMapping("/series")
-    public ResponseEntity<List<Series>> getAllSeries() {
-        return ResponseEntity.ok(catalogService.getAllSeries());
+    @PutMapping("/series/{id}")
+    public SeriesDto updateSeries(@PathVariable Long id, @Valid @RequestBody SeriesRequest request,
+                                  @AuthenticationPrincipal User user) {
+        return catalogService.updateSeries(id, request, user);
     }
 
-    // --- PROFİL İŞLEMLERİ ---
+    /** Cam kalınlığına uygun çıta: GET /catalog/series/5/bead?glassThicknessMm=24 */
+    @GetMapping("/series/{id}/bead")
+    public ProfileDto findBead(@PathVariable Long id, @RequestParam double glassThicknessMm,
+                               @AuthenticationPrincipal User user) {
+        return catalogService.findBead(id, glassThicknessMm, user);
+    }
 
+    // --- PROFİL (mobil uygulama bu uçların entity biçimini kullanıyor) ---
     @PostMapping("/profiles")
-    public ResponseEntity<Profile> createProfile(@RequestBody Profile profile) {
-        return ResponseEntity.ok(catalogService.createProfile(profile));
+    public ProfileDto createProfile(@Valid @RequestBody ProfileRequest request, @AuthenticationPrincipal User user) {
+        return catalogService.createProfile(request, user);
     }
 
-    // Tüm profilleri getiren endpoint (Ayarlar ekranı için gerekli olabilir)
     @GetMapping("/profiles")
-    public ResponseEntity<List<Profile>> getAllProfiles() {
-        return ResponseEntity.ok(catalogService.getAllProfiles());
+    public List<Profile> getAllProfiles(@AuthenticationPrincipal User user) {
+        return catalogService.getAllProfiles(user);
     }
 
     @GetMapping("/profiles/by-series/{seriesId}")
-    public ResponseEntity<List<Profile>> getProfilesBySeries(@PathVariable Long seriesId) {
-        return ResponseEntity.ok(catalogService.getProfilesBySeries(seriesId));
+    public List<Profile> getProfilesBySeries(@PathVariable Long seriesId, @AuthenticationPrincipal User user) {
+        return catalogService.getProfilesBySeries(seriesId, user);
     }
 
     @GetMapping("/profiles/filter")
-    public ResponseEntity<List<Profile>> getProfilesByType(@RequestParam ProfileType type) {
-        return ResponseEntity.ok(catalogService.getProfilesByType(type));
+    public List<Profile> getProfilesByType(@RequestParam ProfileType type, @AuthenticationPrincipal User user) {
+        return catalogService.getProfilesByType(type, user);
     }
 
-    // Profil Fiyatı Güncelle
     @PutMapping("/profiles/{id}/price")
-    public ResponseEntity<Void> updateProfilePrice(@PathVariable Long id, @RequestParam java.math.BigDecimal price) {
-        catalogService.updateProfilePrice(id, price);
+    public ResponseEntity<Void> updateProfilePrice(@PathVariable Long id, @RequestParam BigDecimal price,
+                                                   @AuthenticationPrincipal User user) {
+        catalogService.updateProfilePrice(id, price, user);
         return ResponseEntity.ok().build();
     }
 
-    // --- CAM İŞLEMLERİ ---
-
+    // --- CAM ---
     @PostMapping("/glasses")
-    public ResponseEntity<Glass> createGlass(@RequestBody Glass glass) {
-        return ResponseEntity.ok(catalogService.createGlass(glass));
+    public GlassDto createGlass(@Valid @RequestBody GlassRequest request, @AuthenticationPrincipal User user) {
+        return catalogService.createGlass(request, user);
     }
 
     @GetMapping("/glasses")
-    public ResponseEntity<List<Glass>> getAllGlasses() {
-        return ResponseEntity.ok(catalogService.getAllGlasses());
+    public List<Glass> getAllGlasses(@AuthenticationPrincipal User user) {
+        return catalogService.getAllGlasses(user);
     }
 
-    // Cam Fiyatı Güncelle (404 Hatasını Çözen Kısım)
     @PutMapping("/glasses/{id}/price")
-    public ResponseEntity<Void> updateGlassPrice(@PathVariable Long id, @RequestParam java.math.BigDecimal price) {
-        catalogService.updateGlassPrice(id, price);
+    public ResponseEntity<Void> updateGlassPrice(@PathVariable Long id, @RequestParam BigDecimal price,
+                                                 @AuthenticationPrincipal User user) {
+        catalogService.updateGlassPrice(id, price, user);
         return ResponseEntity.ok().build();
     }
 }

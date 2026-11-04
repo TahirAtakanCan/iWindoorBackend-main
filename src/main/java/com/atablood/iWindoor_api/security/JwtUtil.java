@@ -18,9 +18,12 @@ import java.util.function.Function;
 @Service
 public class JwtUtil {
 
-    // application.properties dosyasından gizli anahtarı alacağız
-    @Value("${jwt.secret:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}")
+    // Base64 kodlu en az 256 bit anahtar. Canlıda JWT_SECRET ortam değişkeninden gelir.
+    @Value("${jwt.secret}")
     private String SECRET_KEY;
+
+    @Value("${jwt.expiration-hours:10}")
+    private long expirationHours;
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
@@ -40,7 +43,7 @@ public class JwtUtil {
                 .setClaims(extraClaims)
                 .setSubject(userDetails.getUsername())
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10)) // 10 Saat geçerli
+                .setExpiration(new Date(System.currentTimeMillis() + expirationHours * 60 * 60 * 1000))
                 .signWith(getSignInKey(), SignatureAlgorithm.HS256)
                 .compact();
     }

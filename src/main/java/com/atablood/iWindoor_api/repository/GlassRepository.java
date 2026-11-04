@@ -4,8 +4,19 @@ import com.atablood.iWindoor_api.entity.Glass;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+import java.util.Optional;
+
 @Repository
 public interface GlassRepository extends JpaRepository<Glass, Long> {
-    // Aktif olan camları listele (Pasifleri getirme)
-    // List<Glass> findByIsActiveTrue(); // Glass entity'sine isActive eklediysen bunu açabilirsin
+
+    List<Glass> findByCompanyIdOrderByIdAsc(Long companyId);
+
+    List<Glass> findByCompanyIdIsNullOrderByIdAsc();
+
+    Optional<Glass> findFirstByCompanyIdAndCode(Long companyId, String code);
+
+    boolean existsByCompanyIdAndCode(Long companyId, String code);
+
+    boolean existsByCompanyIdIsNullAndCode(String code);
 }

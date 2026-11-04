@@ -2,9 +2,14 @@ package com.atablood.iWindoor_api.controller;
 
 import com.atablood.iWindoor_api.dto.ProjectCostSummaryDTO;
 import com.atablood.iWindoor_api.dto.ProjectSpecsDTO;
+import com.atablood.iWindoor_api.dto.project.ProjectRequest;
+import com.atablood.iWindoor_api.dto.window.WindowCreateRequest;
+import com.atablood.iWindoor_api.dto.window.WindowDto;
 import com.atablood.iWindoor_api.entity.Project;
 import com.atablood.iWindoor_api.entity.User;
 import com.atablood.iWindoor_api.service.ProjectService;
+import com.atablood.iWindoor_api.service.WindowService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,20 +23,27 @@ import java.util.List;
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final WindowService windowService;
 
     @PostMapping
-    public ResponseEntity<Project> createProject(@RequestBody Project project, @AuthenticationPrincipal User currentUser) {
-        return ResponseEntity.ok(projectService.createProject(project, currentUser));
+    public Project createProject(@Valid @RequestBody ProjectRequest request, @AuthenticationPrincipal User currentUser) {
+        return projectService.createProject(request, currentUser);
     }
 
     @GetMapping
-    public ResponseEntity<List<Project>> getAllProjects(@AuthenticationPrincipal User currentUser) {
-        return ResponseEntity.ok(projectService.getAllProjects(currentUser));
+    public List<Project> getAllProjects(@AuthenticationPrincipal User currentUser) {
+        return projectService.getAllProjects(currentUser);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Project> getProject(@PathVariable Long id, @AuthenticationPrincipal User currentUser) {
-        return ResponseEntity.ok(projectService.getProject(id, currentUser));
+    public Project getProject(@PathVariable Long id, @AuthenticationPrincipal User currentUser) {
+        return projectService.getProject(id, currentUser);
+    }
+
+    @PutMapping("/{id}")
+    public Project updateProject(@PathVariable Long id, @Valid @RequestBody ProjectRequest request,
+                                 @AuthenticationPrincipal User currentUser) {
+        return projectService.updateProject(id, request, currentUser);
     }
 
     @DeleteMapping("/{id}")
@@ -40,15 +52,32 @@ public class ProjectController {
         return ResponseEntity.ok().build();
     }
 
-    // MEO4: Maliyet Tablosu
-    @GetMapping("/{id}/cost")
-    public ResponseEntity<ProjectCostSummaryDTO> getCostSummary(@PathVariable Long id, @AuthenticationPrincipal User currentUser) {
-        return ResponseEntity.ok(projectService.getCostSummary(id, currentUser));
+    /** Pencere ekle. Eski uygulama {name,width,height}; yeni istemci ek olarak seriesId ve design gönderebilir. */
+    @PostMapping("/{id}/windows")
+    public WindowDto addWindow(@PathVariable Long id, @Valid @RequestBody WindowCreateRequest request,
+                               @AuthenticationPrincipal User currentUser) {
+        return windowService.create(id, request, currentUser);
     }
 
-    // MEO5: Teknik Özellikler
+    @PostMapping("/{id}/calculate-price")
+    public ResponseEntity<Void> calculatePrice(@PathVariable Long id, @AuthenticationPrincipal User currentUser) {
+        projectService.calculatePrice(id, currentUser);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/sync-prices")
+    public ResponseEntity<Void> syncPrices(@PathVariable Long id, @AuthenticationPrincipal User currentUser) {
+        projectService.syncPrices(id, currentUser);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping({"/{id}/cost", "/{id}/cost-summary"})
+    public ProjectCostSummaryDTO getCostSummary(@PathVariable Long id, @AuthenticationPrincipal User currentUser) {
+        return projectService.getCostSummary(id, currentUser);
+    }
+
     @GetMapping("/{id}/specs")
-    public ResponseEntity<ProjectSpecsDTO> getProjectSpecs(@PathVariable Long id, @AuthenticationPrincipal User currentUser) {
-        return ResponseEntity.ok(projectService.getProjectSpecs(id, currentUser));
+    public ProjectSpecsDTO getProjectSpecs(@PathVariable Long id, @AuthenticationPrincipal User currentUser) {
+        return projectService.getProjectSpecs(id, currentUser);
     }
 }

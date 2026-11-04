@@ -2,7 +2,11 @@ package com.atablood.iWindoor_api.service.impl;
 
 import com.atablood.iWindoor_api.dto.CostItemDTO;
 import com.atablood.iWindoor_api.dto.ProjectCostSummaryDTO;
+import com.atablood.iWindoor_api.dto.window.PricedBom;
+import com.atablood.iWindoor_api.dto.window.QuoteLine;
 import com.atablood.iWindoor_api.entity.*;
+import com.atablood.iWindoor_api.exception.NotFoundException;
+import com.atablood.iWindoor_api.pricing.BomPricer;
 import com.atablood.iWindoor_api.repository.ProjectRepository;
 import com.atablood.iWindoor_api.service.PricingService;
 import lombok.RequiredArgsConstructor;
@@ -10,164 +14,159 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.HashMap;
+import java.math.RoundingMode;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * İki tür pencere var:
+ *  - Yeni: bomSnapshot dolu. Birim fiyat kesim listesinden (BomPricer) gelir.
+ *  - Eski: sadece window_nodes ağacı. Kaba hesap (çevre x profil fiyatı + alan x cam fiyatı).
+ */
 @Service
 @RequiredArgsConstructor
 public class PricingServiceImpl implements PricingService {
 
     private final ProjectRepository projectRepository;
+    private final BomPricer bomPricer;
 
     @Override
     @Transactional
     public void calculateProjectPrice(Long projectId) {
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Proje bulunamadı"));
-
-        double totalProjectPrice = 0.0;
-
+        Project project = projectRepository.findById(projectId).orElseThrow(() -> new NotFoundException("Proje", projectId));
+        BigDecimal total = BigDecimal.ZERO;
         for (WindowUnit unit : project.getWindowUnits()) {
-            if (unit.getRootNode() != null) {
-                totalProjectPrice += calculateNodeCost(unit.getRootNode());
+            if (unit.getBomSnapshot() == null) {
+                double legacy = unit.getRootNode() == null ? 0.0 : legacyNodeCost(unit.getRootNode());
+                unit.setUnitPrice(BigDecimal.valueOf(legacy).setScale(2, RoundingMode.HALF_UP));
             }
+            BigDecimal unitPrice = unit.getUnitPrice() == null ? BigDecimal.ZERO : unit.getUnitPrice();
+            total = total.add(unitPrice.multiply(BigDecimal.valueOf(qty(unit))));
         }
-
-        project.setTotalPrice(BigDecimal.valueOf(totalProjectPrice));
+        project.setTotalPrice(total.setScale(2, RoundingMode.HALF_UP));
         projectRepository.save(project);
     }
 
-    // --- MEO4 İÇİN GÜNCELLENEN METOD ---
     @Override
-    public ProjectCostSummaryDTO calculateCostSummary(Project project) {
-        // Not: Burada tekrar repository'den çekmeye gerek yok,
-        // çünkü ProjectServiceImpl zaten güvenlik kontrolünü yapıp bize temiz nesneyi verdi.
-
-        ProjectCostSummaryDTO summary = new ProjectCostSummaryDTO();
-        Map<String, CostItemDTO> profileMap = new HashMap<>();
-        Map<String, CostItemDTO> glassMap = new HashMap<>();
-
-        if (project.getWindowUnits() != null) {
-            for (WindowUnit unit : project.getWindowUnits()) {
-                if (unit.getRootNode() != null) {
-                    collectMaterials(unit.getRootNode(), profileMap, glassMap);
-                }
+    @Transactional
+    public void syncPrices(Long projectId) {
+        Project project = projectRepository.findById(projectId).orElseThrow(() -> new NotFoundException("Proje", projectId));
+        Long companyId = companyOf(project);
+        for (WindowUnit unit : project.getWindowUnits()) {
+            if (unit.getBomSnapshot() != null) {
+                unit.setUnitPrice(bomPricer.price(companyId, unit.getSeries(), unit.getBomSnapshot()).total());
+            } else if (unit.getRootNode() != null) {
+                refreshStoredPrices(unit.getRootNode());
             }
         }
+        projectRepository.save(project);
+        calculateProjectPrice(projectId);
+    }
 
-        profileMap.values().forEach(summary::addItem);
-        glassMap.values().forEach(summary::addItem);
+    @Override
+    public ProjectCostSummaryDTO calculateCostSummary(Project project) {
+        ProjectCostSummaryDTO summary = new ProjectCostSummaryDTO();
+        Map<String, CostItemDTO> items = new LinkedHashMap<>();
+        Long companyId = companyOf(project);
 
+        for (WindowUnit unit : project.getWindowUnits()) {
+            int q = qty(unit);
+            if (unit.getBomSnapshot() != null) {
+                PricedBom priced = bomPricer.price(companyId, unit.getSeries(), unit.getBomSnapshot());
+                for (QuoteLine l : priced.lines()) {
+                    merge(items, l.name(), category(l.group()), l.quantity() * q, l.unit(),
+                            l.total().multiply(BigDecimal.valueOf(q)));
+                }
+            } else if (unit.getRootNode() != null) {
+                collectLegacy(unit.getRootNode(), items, q);
+            }
+        }
+        items.values().forEach(i -> {
+            i.setQuantity(Math.round(i.getQuantity() * 1000.0) / 1000.0);
+            i.setPrice(i.getPrice().setScale(2, RoundingMode.HALF_UP));
+            summary.addItem(i);
+        });
         return summary;
     }
 
-    // --- YARDIMCI METODLAR (Aynı kalıyor) ---
+    // ---------------- yardımcılar ----------------
 
-    private double calculateNodeCost(WindowNode node) {
-        double nodeCost = 0.0;
-
-        double widthM = node.getWidth() / 1000.0;
-        double heightM = node.getHeight() / 1000.0;
-
-        // 1. PROFİL MALİYETİ
-        if (node.getProfile() != null) {
-            double lengthM = 0.0;
-
-            BigDecimal unitPriceBd = (node.getStoredPrice() != null)
-                    ? node.getStoredPrice()
-                    : node.getProfile().getPricePerMeter();
-
-            double price = unitPriceBd.doubleValue();
-
-            if (node.getNodeType().name().equals("FRAME") || node.getNodeType().name().equals("SASH")) {
-                lengthM = (widthM + heightM) * 2;
-            } else if (node.getNodeType().name().equals("MULLION_VERTICAL")) {
-                lengthM = heightM;
-            } else if (node.getNodeType().name().equals("MULLION_HORIZONTAL")) {
-                lengthM = widthM;
-            }
-
-            double cost = lengthM * price;
-            nodeCost += cost;
-        }
-
-        // 2. CAM MALİYETİ
-        if (node.getGlass() != null) {
-            BigDecimal unitPriceBd = (node.getStoredPrice() != null)
-                    ? node.getStoredPrice()
-                    : node.getGlass().getPricePerSquareMeter();
-
-            double area = widthM * heightM;
-            nodeCost += (area * unitPriceBd.doubleValue());
-        }
-
-        // 3. ÇOCUKLAR
-        if (node.getChildren() != null && !node.getChildren().isEmpty()) {
-            for (WindowNode child : node.getChildren()) {
-                nodeCost += calculateNodeCost(child);
-            }
-        }
-
-        return nodeCost;
+    private static int qty(WindowUnit u) {
+        return u.getQuantity() == null || u.getQuantity() < 1 ? 1 : u.getQuantity();
     }
 
-    private void collectMaterials(WindowNode node, Map<String, CostItemDTO> profileMap, Map<String, CostItemDTO> glassMap) {
-        // 1. Profil Hesabı
+    private static Long companyOf(Project p) {
+        return p.getCreatedBy() == null || p.getCreatedBy().getCompany() == null ? null : p.getCreatedBy().getCompany().getId();
+    }
+
+    private static String category(String group) {
+        return switch (group) {
+            case "PROFILE" -> "Profil";
+            case "BEAD" -> "Çıta";
+            case "DUPLEX" -> "Dubleks";
+            case "GLASS" -> "Cam";
+            case "PANEL" -> "Panel";
+            default -> "Diğer";
+        };
+    }
+
+    private static void merge(Map<String, CostItemDTO> items, String name, String category, double quantity, String unit,
+                              BigDecimal price) {
+        items.merge(category + "|" + name, new CostItemDTO(name, category, quantity, unit, price), (a, b) -> {
+            a.setQuantity(a.getQuantity() + b.getQuantity());
+            a.setPrice(a.getPrice().add(b.getPrice()));
+            return a;
+        });
+    }
+
+    private static double legacyLengthM(WindowNode node) {
+        double w = node.getWidth() == null ? 0 : node.getWidth() / 1000.0;
+        double h = node.getHeight() == null ? 0 : node.getHeight() / 1000.0;
+        return switch (node.getNodeType() == null ? NodeType.EMPTY : node.getNodeType()) {
+            case FRAME, SASH -> (w + h) * 2;
+            case MULLION_VERTICAL -> h;
+            case MULLION_HORIZONTAL -> w;
+            default -> 0.0;
+        };
+    }
+
+    private double legacyNodeCost(WindowNode node) {
+        double cost = 0.0;
         if (node.getProfile() != null) {
-            String name = node.getProfile().getName();
-            double lengthM = 0;
-
-            if (node.getNodeType() == NodeType.FRAME || node.getNodeType() == NodeType.SASH) {
-                lengthM = (node.getWidth() * 2 + node.getHeight() * 2) / 1000.0;
-            } else if (node.getNodeType() == NodeType.MULLION_VERTICAL) {
-                lengthM = node.getHeight() / 1000.0;
-            } else if (node.getNodeType() == NodeType.MULLION_HORIZONTAL) {
-                lengthM = node.getWidth() / 1000.0;
-            }
-
-            if (lengthM > 0) {
-                BigDecimal unitPrice = (node.getStoredPrice() != null)
-                        ? node.getStoredPrice()
-                        : node.getProfile().getPricePerMeter();
-
-                BigDecimal cost = unitPrice.multiply(BigDecimal.valueOf(lengthM));
-
-                profileMap.merge(name,
-                        new CostItemDTO(name, "Profil", lengthM, "m", cost),
-                        (oldItem, newItem) -> {
-                            oldItem.setQuantity(oldItem.getQuantity() + newItem.getQuantity());
-                            oldItem.setPrice(oldItem.getPrice().add(newItem.getPrice()));
-                            return oldItem;
-                        }
-                );
-            }
+            BigDecimal p = node.getStoredPrice() != null ? node.getStoredPrice() : node.getProfile().getPricePerMeter();
+            cost += legacyLengthM(node) * p.doubleValue();
         }
-
-        // 2. Cam Hesabı
         if (node.getGlass() != null) {
-            String name = node.getGlass().getName();
-            double area = (node.getWidth() * node.getHeight()) / 1_000_000.0;
-
-            BigDecimal unitPrice = (node.getStoredPrice() != null)
-                    ? node.getStoredPrice()
-                    : node.getGlass().getPricePerSquareMeter();
-
-            BigDecimal cost = unitPrice.multiply(BigDecimal.valueOf(area));
-
-            glassMap.merge(name,
-                    new CostItemDTO(name, "Cam", area, "m2", cost),
-                    (oldItem, newItem) -> {
-                        oldItem.setQuantity(oldItem.getQuantity() + newItem.getQuantity());
-                        oldItem.setPrice(oldItem.getPrice().add(newItem.getPrice()));
-                        return oldItem;
-                    }
-            );
+            BigDecimal p = node.getStoredPrice() != null ? node.getStoredPrice() : node.getGlass().getPricePerSquareMeter();
+            cost += area(node) * p.doubleValue();
         }
+        if (node.getChildren() != null) for (WindowNode c : node.getChildren()) cost += legacyNodeCost(c);
+        return cost;
+    }
 
-        if (node.getChildren() != null) {
-            for (WindowNode child : node.getChildren()) {
-                collectMaterials(child, profileMap, glassMap);
+    private static double area(WindowNode n) {
+        return (n.getWidth() == null ? 0 : n.getWidth()) * (n.getHeight() == null ? 0 : n.getHeight()) / 1_000_000.0;
+    }
+
+    private void refreshStoredPrices(WindowNode node) {
+        if (node.getProfile() != null) node.setStoredPrice(node.getProfile().getPricePerMeter());
+        else if (node.getGlass() != null) node.setStoredPrice(node.getGlass().getPricePerSquareMeter());
+        if (node.getChildren() != null) node.getChildren().forEach(this::refreshStoredPrices);
+    }
+
+    private void collectLegacy(WindowNode node, Map<String, CostItemDTO> items, int q) {
+        if (node.getProfile() != null) {
+            double m = legacyLengthM(node);
+            if (m > 0) {
+                BigDecimal p = node.getStoredPrice() != null ? node.getStoredPrice() : node.getProfile().getPricePerMeter();
+                merge(items, node.getProfile().getName(), "Profil", m * q, "m", p.multiply(BigDecimal.valueOf(m * q)));
             }
         }
+        if (node.getGlass() != null) {
+            double a = area(node);
+            BigDecimal p = node.getStoredPrice() != null ? node.getStoredPrice() : node.getGlass().getPricePerSquareMeter();
+            merge(items, node.getGlass().getName(), "Cam", a * q, "m2", p.multiply(BigDecimal.valueOf(a * q)));
+        }
+        if (node.getChildren() != null) for (WindowNode c : node.getChildren()) collectLegacy(c, items, q);
     }
 }

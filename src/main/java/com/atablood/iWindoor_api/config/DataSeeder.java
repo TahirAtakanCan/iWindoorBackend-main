@@ -1,66 +1,103 @@
 package com.atablood.iWindoor_api.config;
 
-import com.atablood.iWindoor_api.entity.Glass;
-import com.atablood.iWindoor_api.entity.Profile;
-import com.atablood.iWindoor_api.entity.ProfileType; // Enum importu önemli
+import com.atablood.iWindoor_api.entity.*;
+import com.atablood.iWindoor_api.repository.AccessoryRepository;
 import com.atablood.iWindoor_api.repository.GlassRepository;
 import com.atablood.iWindoor_api.repository.ProfileRepository;
+import com.atablood.iWindoor_api.repository.SeriesRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 
+/**
+ * Şablon katalog (company_id IS NULL). Yeni şirketler kayıt olurken bunun kopyasını alır.
+ * Ölçüler ve fiyatlar ÖRNEKTİR; gerçek seri kataloğundan girilmelidir.
+ */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class DataSeeder implements CommandLineRunner {
 
+    static final String TEMPLATE_SERIES = "70 Seri (Örnek)";
+
+    private final SeriesRepository seriesRepository;
     private final ProfileRepository profileRepository;
     private final GlassRepository glassRepository;
+    private final AccessoryRepository accessoryRepository;
 
     @Override
-    public void run(String... args) throws Exception {
-        // Profil tablosu boşsa doldur
-        if (profileRepository.count() == 0) {
-            System.out.println("--- Veritabanı Başlatılıyor: Varsayılan Profiller Ekleniyor ---");
+    @Transactional
+    public void run(String... args) {
+        // Her şablon kaydı ayrı kontrol edilir: eski veritabanında başka global kayıtlar olsa da örnek katalog eklenir.
+        if (!seriesRepository.existsByCompanyIdIsNullAndName(TEMPLATE_SERIES)) {
+            log.info("Şablon seri ve profiller ekleniyor");
+            Series s = new Series(); // geometri alanları entity varsayılanlarıyla (70 seri örnek değerleri) gelir
+            s.setName(TEMPLATE_SERIES);
+            s.setBrand("Örnek");
+            s.setSystemDepth(70);
+            s.setMaterial("PVC");
+            s = seriesRepository.save(s);
 
-            // Kasalar
-            profileRepository.save(createProfile("60'lık Geniş Kasa", ProfileType.FRAME, 120.0));
-            profileRepository.save(createProfile("70'lik Süper Kasa", ProfileType.FRAME, 150.0));
-
-            // Kanatlar
-            profileRepository.save(createProfile("60'lık Düz Kanat", ProfileType.SASH, 130.0));
-            profileRepository.save(createProfile("70'lik Elit Kanat", ProfileType.SASH, 160.0));
-
-            // *** KAYITLAR (MULLION) - Bunlar eksikti ***
-            profileRepository.save(createProfile("60'lık Orta Kayıt", ProfileType.MULLION, 125.0));
-            profileRepository.save(createProfile("70'lik Orta Kayıt", ProfileType.MULLION, 155.0));
+            profile(s, "K70-62", "Kasa 70", ProfileType.FRAME, 62, 180, null, null, true);
+            profile(s, "KN70-78", "Kanat 70", ProfileType.SASH, 78, 195, null, null, true);
+            profile(s, "OK70-80", "Orta Kayıt 70", ProfileType.MULLION, 80, 190, null, null, true);
+            profile(s, "CT70-24", "Çıta (24 mm cam)", ProfileType.BEAD, 20, 35, 22.0, 26.0, true);
+            profile(s, "CT70-32", "Çıta (32 mm cam)", ProfileType.BEAD, 20, 38, 30.0, 34.0, false);
+            profile(s, "CT70-4", "Çıta (tek cam)", ProfileType.BEAD, 20, 30, 3.0, 8.0, false);
+            profile(s, "AD70", "Çift Kanat Adaptörü 70", ProfileType.ADAPTER, 40, 120, null, null, true);
         }
-
-        // Cam tablosu boşsa doldur
-        if (glassRepository.count() == 0) {
-            System.out.println("--- Veritabanı Başlatılıyor: Varsayılan Camlar Ekleniyor ---");
-
-            glassRepository.save(createGlass("4mm Tek Cam", 250.0));
-            glassRepository.save(createGlass("4+12+4 Isıcam S", 450.0));
-            glassRepository.save(createGlass("4+16+4 Konfor Cam", 600.0));
-        }
+        glass("4+16+4", "Şeffaf Isıcam 4+16+4", 24, "clear", 650);
+        glass("4+16+4 LE", "Low-E Isıcam 4+16+4", 24, "lowe", 950);
+        glass("4F+16+4", "Füme Isıcam 4+16+4", 24, "smoke", 900);
+        glass("4B+16+4", "Bronz Isıcam 4+16+4", 24, "bronze", 900);
+        glass("4R+16+4", "Reflekte Isıcam 4+16+4", 24, "mirror", 1100);
+        glass("4S+16+4", "Buzlu (Satina) Isıcam 4+16+4", 24, "frost", 1000);
+        glass("4D+16+4", "Desenli Isıcam 4+16+4", 24, "pattern", 850);
+        glass("33.1+16+4", "Lamine Isıcam 33.1+16+4", 26, "lam", 1400);
+        glass("4", "Tek Cam 4 mm", 4, "clear", 300);
+        glass("PANEL-24", "Dolgu Panel 24 mm", 24, "panel", 700);
+        accessory("DUPLEX", "Dubleks çıta", AccessoryUnit.METER, 45);
+        accessory("KOL-STD", "Pencere kolu", AccessoryUnit.PIECE, 250);
+        accessory("CONTA-EPDM", "EPDM conta", AccessoryUnit.METER, 12);
     }
 
-    private Profile createProfile(String name, ProfileType type, double price) {
+    private void profile(Series s, String code, String name, ProfileType type, double face, double price,
+                         Double minGlass, Double maxGlass, boolean isDefault) {
         Profile p = new Profile();
+        p.setSeries(s);
+        p.setCode(code);
         p.setName(name);
         p.setType(type);
+        p.setWidthMm(face);
         p.setPricePerMeter(BigDecimal.valueOf(price));
-        p.setCurrency("TL");
-        return p;
+        p.setMinGlassMm(minGlass);
+        p.setMaxGlassMm(maxGlass);
+        p.setDefaultForType(isDefault);
+        profileRepository.save(p);
     }
 
-    private Glass createGlass(String name, double price) {
+    private void glass(String code, String name, int thickness, String style, double price) {
+        if (glassRepository.existsByCompanyIdIsNullAndCode(code)) return;
         Glass g = new Glass();
+        g.setCode(code);
         g.setName(name);
+        g.setThicknessMm(thickness);
+        g.setVisualStyle(style);
         g.setPricePerSquareMeter(BigDecimal.valueOf(price));
-        g.setCurrency("TL");
-        return g;
+        glassRepository.save(g);
+    }
+
+    private void accessory(String code, String name, AccessoryUnit unit, double price) {
+        if (accessoryRepository.existsByCompanyIdIsNullAndCode(code)) return;
+        Accessory a = new Accessory();
+        a.setCode(code);
+        a.setName(name);
+        a.setUnit(unit);
+        a.setPrice(BigDecimal.valueOf(price));
+        accessoryRepository.save(a);
     }
 }

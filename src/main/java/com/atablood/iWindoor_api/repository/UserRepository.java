@@ -8,7 +8,8 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
 
-    // --- YENİ EKLENEN METOD ---
+    Optional<User> findByEmailIgnoreCase(String email);
+
     // Şirket ID'sine göre kullanıcıları getir
     List<User> findAllByCompanyId(Long companyId);
 }

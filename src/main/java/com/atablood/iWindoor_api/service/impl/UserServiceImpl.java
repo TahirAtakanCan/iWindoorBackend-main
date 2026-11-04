@@ -6,6 +6,9 @@ import com.atablood.iWindoor_api.entity.Role;
 import com.atablood.iWindoor_api.entity.User;
 import com.atablood.iWindoor_api.repository.UserRepository;
 import com.atablood.iWindoor_api.service.UserService;
+import com.atablood.iWindoor_api.exception.BadRequestException;
+import com.atablood.iWindoor_api.exception.ConflictException;
+import com.atablood.iWindoor_api.exception.ForbiddenException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -25,7 +28,7 @@ public class UserServiceImpl implements UserService {
     public List<UserDTO> getMyEmployees(User currentUser) {
         // Şirket kontrolü
         if (currentUser.getCompany() == null) {
-            throw new RuntimeException("Bir şirkete bağlı değilsiniz.");
+            throw new ForbiddenException("Bir şirkete bağlı değilsiniz.");
         }
 
         // ESKİ HATALI YÖNTEM:
@@ -44,19 +47,24 @@ public class UserServiceImpl implements UserService {
     @Override
     public void createEmployee(User currentUser, RegisterRequest request) {
         if (currentUser.getCompany() == null) {
-            throw new RuntimeException("Çalışan eklemek için bir şirketiniz olmalı.");
+            throw new ForbiddenException("Çalışan eklemek için bir şirketiniz olmalı.");
         }
 
-        // Yeni çalışanı oluştur
+        if (request.getEmail() == null || request.getEmail().isBlank()
+                || request.getPassword() == null || request.getPassword().length() < 6) {
+            throw new BadRequestException("VALIDATION_FAILED", "E-posta gerekli, şifre en az 6 karakter olmalı.");
+        }
+
+        String email = request.getEmail().trim().toLowerCase();
+        if (userRepository.findByEmailIgnoreCase(email).isPresent()) {
+            throw new ConflictException("EMAIL_TAKEN", "Bu e-posta ile kayıtlı bir kullanıcı var.");
+        }
+
         User employee = new User();
         employee.setFullName(request.getFullName());
-        employee.setEmail(request.getEmail());
+        employee.setEmail(email);
         employee.setPassword(passwordEncoder.encode(request.getPassword()));
-
-        // ÖNEMLİ: Ekleyen kişinin şirketi neyse, çalışanınki de o olur.
         employee.setCompany(currentUser.getCompany());
-
-        // Rolü otomatik olarak 'EMPLOYEE' (Çalışan) yapıyoruz
         employee.setRole(Role.EMPLOYEE);
 
         userRepository.save(employee);

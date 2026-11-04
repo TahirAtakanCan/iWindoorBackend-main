@@ -1,6 +1,7 @@
 package com.atablood.iWindoor_api.entity;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,6 +29,7 @@ public class User implements UserDetails { // <-- DEĞİŞİKLİK BURADA
     @Column(unique = true, nullable = false)
     private String email;
 
+    @JsonIgnore
     @Column(nullable = false)
     private String password;
 
@@ -39,6 +41,8 @@ public class User implements UserDetails { // <-- DEĞİŞİKLİK BURADA
     @ManyToOne
     @JoinColumn(name = "company_id")
     @JsonBackReference
+    @lombok.ToString.Exclude
+    @lombok.EqualsAndHashCode.Exclude
     private Company company;
 
     // --- UserDetails Metodları ---

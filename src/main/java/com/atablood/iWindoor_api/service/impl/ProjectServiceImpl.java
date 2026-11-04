@@ -2,150 +2,130 @@ package com.atablood.iWindoor_api.service.impl;
 
 import com.atablood.iWindoor_api.dto.ProjectCostSummaryDTO;
 import com.atablood.iWindoor_api.dto.ProjectSpecsDTO;
+import com.atablood.iWindoor_api.dto.project.ProjectRequest;
 import com.atablood.iWindoor_api.entity.Project;
 import com.atablood.iWindoor_api.entity.User;
 import com.atablood.iWindoor_api.entity.WindowNode;
 import com.atablood.iWindoor_api.entity.WindowUnit;
+import com.atablood.iWindoor_api.exception.NotFoundException;
 import com.atablood.iWindoor_api.repository.ProjectRepository;
-import com.atablood.iWindoor_api.repository.UserRepository;
+import com.atablood.iWindoor_api.security.AccessGuard;
 import com.atablood.iWindoor_api.service.PricingService;
 import com.atablood.iWindoor_api.service.ProjectService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 public class ProjectServiceImpl implements ProjectService {
 
     private final ProjectRepository projectRepository;
-    private final PricingService pricingService; // Maliyet hesaplamaları için
-    private final UserRepository userRepository;
+    private final PricingService pricingService;
+    private final AccessGuard guard;
 
-    // 1. PROJE OLUŞTURMA (User'a bağlanarak)
     @Override
-    public Project createProject(Project project, User currentUser) {
-        // Projeyi oluşturan kişiyi set et
+    @Transactional
+    public Project createProject(ProjectRequest request, User currentUser) {
+        guard.companyId(currentUser);
+        Project project = new Project();
+        project.setName(request.name());
+        project.setDescription(request.description());
         project.setCreatedBy(currentUser);
-
-        // Eğer proje adı boşsa varsayılan ata
-        if (project.getName() == null || project.getName().isEmpty()) {
-            project.setName("Yeni Proje");
-        }
-
-        // Listeler null ise başlat (Hata önleyici)
-        if (project.getWindowUnits() == null) {
-            project.setWindowUnits(new ArrayList<>());
-        }
-
         return projectRepository.save(project);
     }
 
-    // 2. PROJELERİ LİSTELEME (Sadece kendi şirketim)
     @Override
-    public List<Project> getAllProjects(User currentUser) {
-        if (currentUser.getCompany() == null) {
-            // Eğer kullanıcının şirketi yoksa boş liste dön veya hata fırlat
-            // Güvenlik için boş liste dönüyoruz.
-            return new ArrayList<>();
-        }
-
-        Long companyId = currentUser.getCompany().getId();
-        // Repository'deki özel metodu çağır
-        return projectRepository.findAllByCreatedBy_Company_Id(companyId);
+    @Transactional
+    public Project updateProject(Long id, ProjectRequest request, User currentUser) {
+        Project project = getProject(id, currentUser);
+        project.setName(request.name());
+        project.setDescription(request.description());
+        return projectRepository.save(project);
     }
 
-    // 3. TEK PROJE GETİRME (Güvenlik Kontrollü)
+    @Override
+    public List<Project> getAllProjects(User currentUser) {
+        return projectRepository.findAllByCreatedBy_Company_Id(guard.companyId(currentUser));
+    }
+
     @Override
     public Project getProject(Long id, User currentUser) {
-        Project project = projectRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Proje bulunamadı"));
-
-        // --- GÜVENLİK DUVARI ---
-        // Projenin sahibinin şirketi ile giren kişinin şirketi aynı mı?
-        if (project.getCreatedBy() == null || project.getCreatedBy().getCompany() == null) {
-            // Sahipsiz proje (eski veri) ise erişime izin ver veya engelle.
-            // Şimdilik sadece loglayıp geçiyoruz ama normalde engellenmeli.
-        } else {
-            Long projectCompanyId = project.getCreatedBy().getCompany().getId();
-            Long userCompanyId = currentUser.getCompany().getId();
-
-            if (!projectCompanyId.equals(userCompanyId)) {
-                throw new RuntimeException("Bu projeyi görüntüleme yetkiniz yok! (Farklı Şirket)");
-            }
-        }
-        // -----------------------
-
+        Project project = projectRepository.findById(id).orElseThrow(() -> new NotFoundException("Proje", id));
+        guard.checkProject(project, currentUser);
         return project;
     }
 
-    // 4. PROJE SİLME
     @Override
+    @Transactional
     public void deleteProject(Long id, User currentUser) {
-        // getProject metodunu çağırarak güvenlik kontrolünü orada yapıyoruz
-        Project project = getProject(id, currentUser);
-        projectRepository.delete(project);
+        projectRepository.delete(getProject(id, currentUser));
     }
 
-    // 5. MEO4: MALİYET TABLOSU (Maliyet Hesaplama)
     @Override
+    @Transactional
+    public void calculatePrice(Long id, User currentUser) {
+        getProject(id, currentUser);
+        pricingService.calculateProjectPrice(id);
+    }
+
+    @Override
+    @Transactional
+    public void syncPrices(Long id, User currentUser) {
+        getProject(id, currentUser);
+        pricingService.syncPrices(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public ProjectCostSummaryDTO getCostSummary(Long projectId, User currentUser) {
-        // 1. Projeyi güvenli şekilde çek
-        Project project = getProject(projectId, currentUser);
-
-        // 2. PricingService kullanarak hesaplat (Fiyatları güncelle)
-        // Not: PricingService'in "calculateCostSummary" diye bir metodu olduğunu varsayıyoruz.
-        // Eğer yoksa, PricingService'e bu metodu eklememiz gerekir.
-        // Şimdilik projeyi hesaplatıp DTO'yu döndüren mantığı çağırıyoruz.
-        return pricingService.calculateCostSummary(project);
+        return pricingService.calculateCostSummary(getProject(projectId, currentUser));
     }
 
-    // 6. MEO5: TEKNİK ÖZELLİKLER (Proje Özeti)
     @Override
+    @Transactional(readOnly = true)
     public ProjectSpecsDTO getProjectSpecs(Long projectId, User currentUser) {
         Project project = getProject(projectId, currentUser);
         ProjectSpecsDTO specs = new ProjectSpecsDTO();
-
         specs.setProjectName(project.getName());
         specs.setTotalWindowCount(project.getWindowUnits().size());
 
-        double totalArea = 0;
-        Set<String> profileNames = new HashSet<>();
-        Set<String> glassNames = new HashSet<>();
+        double totalArea = 0, profileM = 0;
+        Set<String> profileNames = new LinkedHashSet<>();
+        Set<String> glassNames = new LinkedHashSet<>();
 
         for (WindowUnit unit : project.getWindowUnits()) {
-            // Pencere Alanı (m2)
-            totalArea += (unit.getWidth() * unit.getHeight()) / 1_000_000.0;
-
-            if (unit.getRootNode() != null) {
+            int q = unit.getQuantity() == null || unit.getQuantity() < 1 ? 1 : unit.getQuantity();
+            if (unit.getWidth() != null && unit.getHeight() != null) {
+                totalArea += unit.getWidth() * unit.getHeight() / 1_000_000.0 * q;
+            }
+            if (unit.getBomSnapshot() != null) {
+                for (Map<String, Object> l : unit.getBomSnapshot()) {
+                    Object group = l.get("group");
+                    if ("PROFILE".equals(group) && l.get("length") instanceof Number len && l.get("qty") instanceof Number n) {
+                        profileM += len.doubleValue() / 1000.0 * n.intValue() * q;
+                        if (l.get("role") instanceof String r) profileNames.add(r);
+                    }
+                    if (("GLASS".equals(group) || "PANEL".equals(group)) && l.get("glassCode") instanceof String g) {
+                        glassNames.add(g);
+                    }
+                }
+            } else if (unit.getRootNode() != null) {
                 collectSpecsRecursive(unit.getRootNode(), profileNames, glassNames);
             }
         }
-
-        specs.setTotalAreaM2(Math.round(totalArea * 100.0) / 100.0); // 2 hane yuvarla
+        specs.setTotalAreaM2(Math.round(totalArea * 100.0) / 100.0);
+        specs.setTotalProfileLengthM(Math.round(profileM * 100.0) / 100.0);
         specs.setUsedProfileTypes(new ArrayList<>(profileNames));
         specs.setUsedGlassTypes(new ArrayList<>(glassNames));
-
         return specs;
     }
 
-    // MEO5 için yardımcı metod (Recursive)
     private void collectSpecsRecursive(WindowNode node, Set<String> profiles, Set<String> glasses) {
-        if (node.getProfile() != null) {
-            profiles.add(node.getProfile().getName());
-        }
-        if (node.getGlass() != null) {
-            glasses.add(node.getGlass().getName());
-        }
-
-        if (node.getChildren() != null) {
-            for (WindowNode child : node.getChildren()) {
-                collectSpecsRecursive(child, profiles, glasses);
-            }
-        }
+        if (node.getProfile() != null) profiles.add(node.getProfile().getName());
+        if (node.getGlass() != null) glasses.add(node.getGlass().getName());
+        if (node.getChildren() != null) for (WindowNode child : node.getChildren()) collectSpecsRecursive(child, profiles, glasses);
     }
 }

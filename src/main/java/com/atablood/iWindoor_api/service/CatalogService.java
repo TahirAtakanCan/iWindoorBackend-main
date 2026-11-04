@@ -1,25 +1,44 @@
 package com.atablood.iWindoor_api.service;
 
-import com.atablood.iWindoor_api.entity.Glass;
-import com.atablood.iWindoor_api.entity.Profile;
-import com.atablood.iWindoor_api.entity.ProfileType;
-import com.atablood.iWindoor_api.entity.Series;
+import com.atablood.iWindoor_api.dto.catalog.*;
+import com.atablood.iWindoor_api.entity.*;
+
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface CatalogService {
-    // Seri İşlemleri
-    Series createSeries(Series series);
-    List<Series> getAllSeries();
 
-    // Profil İşlemleri
-    Profile createProfile(Profile profile);
-    List<Profile> getAllProfiles(); // <-- LİSTELEME İÇİN EKLENDİ
-    List<Profile> getProfilesBySeries(Long seriesId);
-    List<Profile> getProfilesByType(ProfileType type);
-    void updateProfilePrice(Long id, java.math.BigDecimal newPrice);
+    CatalogSnapshotDto snapshot(User user);
 
-    // Cam İşlemleri
-    Glass createGlass(Glass glass);
-    List<Glass> getAllGlasses();
-    void updateGlassPrice(Long id, java.math.BigDecimal newPrice); // <-- EKSİK OLAN BUYDU
+    // --- Seri ---
+    List<Series> getAllSeries(User user);
+
+    SeriesDto createSeries(SeriesRequest request, User user);
+
+    SeriesDto updateSeries(Long id, SeriesRequest request, User user);
+
+    // --- Profil ---
+    List<Profile> getAllProfiles(User user);
+
+    List<Profile> getProfilesBySeries(Long seriesId, User user);
+
+    List<Profile> getProfilesByType(ProfileType type, User user);
+
+    ProfileDto createProfile(ProfileRequest request, User user);
+
+    void updateProfilePrice(Long id, BigDecimal price, User user);
+
+    ProfileDto findBead(Long seriesId, double glassThicknessMm, User user);
+
+    // --- Cam ---
+    List<Glass> getAllGlasses(User user);
+
+    GlassDto createGlass(GlassRequest request, User user);
+
+    void updateGlassPrice(Long id, BigDecimal price, User user);
+
+    /** Şirketin ilk aktif serisi (yeni pencerelerin varsayılanı). */
+    Series defaultSeries(Long companyId);
+
+    Series requireSeries(Long seriesId, User user);
 }
