@@ -32,27 +32,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 class WindowApiIntegrationTest {
 
-    private static final String DESIGN = """
-            {"schemaVersion":1,"width":1800,"height":1700,"series":"%s","color":"white","root":
-             {"id":"n1","type":"split","dir":"H","sizes":[400,1300],"children":[
-               {"id":"n2","type":"split","dir":"V","sizes":[600,600,600],"children":[
-                 {"id":"n3","type":"glass","glass":"4+16+4"},{"id":"n4","type":"glass","glass":"4+16+4"},{"id":"n5","type":"glass","glass":"4+16+4"}]},
-               {"id":"n6","type":"split","dir":"V","sizes":[600,600,600],"children":[
-                 {"id":"n7","type":"glass","glass":"4+16+4"},
-                 {"id":"n8","type":"sash","open":"tiltTurnLeft","child":{"id":"n9","type":"glass","glass":"4+16+4"}},
-                 {"id":"n10","type":"glass","glass":"4+16+4"}]}]}}""";
-
-    private static final String BOM = """
-            [{"group":"PROFILE","role":"FRAME","length":1806,"qty":2},{"group":"PROFILE","role":"FRAME","length":1706,"qty":2},
-             {"group":"PROFILE","role":"MULLION","length":1682,"qty":1},{"group":"PROFILE","role":"MULLION","length":1204,"qty":2},
-             {"group":"PROFILE","role":"MULLION","length":304,"qty":2},
-             {"group":"PROFILE","role":"SASH","length":542,"qty":2},{"group":"PROFILE","role":"SASH","length":1220,"qty":2},
-             {"group":"BEAD","length":1198,"qty":4,"glassCode":"4+16+4"},{"group":"BEAD","length":1058,"qty":2,"glassCode":"4+16+4"},
-             {"group":"BEAD","length":520,"qty":2,"glassCode":"4+16+4"},{"group":"BEAD","length":498,"qty":8,"glassCode":"4+16+4"},
-             {"group":"BEAD","length":380,"qty":2,"glassCode":"4+16+4"},{"group":"BEAD","length":298,"qty":6,"glassCode":"4+16+4"},
-             {"group":"GLASS","glassCode":"4+16+4","w":548,"h":326,"qty":1},{"group":"GLASS","glassCode":"4+16+4","w":526,"h":326,"qty":2},
-             {"group":"GLASS","glassCode":"4+16+4","w":526,"h":1226,"qty":2},{"group":"GLASS","glassCode":"4+16+4","w":408,"h":1086,"qty":1}]""";
-
     @Autowired
     private WebApplicationContext context;
     private MockMvc mvc;
@@ -93,7 +72,7 @@ class WindowApiIntegrationTest {
         String series = str(snap, "$.series[0].id");
 
         String project = str(call(post("/api/v1/projects"), t1, "{\"name\":\"Yayla Evi\"}").andExpect(status().isOk()), "$.id");
-        String design = DESIGN.formatted(series);
+        String design = TestData.DESIGN.formatted(series);
 
         ResultActions created = call(post("/api/v1/projects/" + project + "/windows"), t1,
                 "{\"name\":\"Salon\",\"width\":1800,\"height\":1700,\"seriesId\":" + series + ",\"design\":" + design + "}")
@@ -102,7 +81,7 @@ class WindowApiIntegrationTest {
                 .andExpect(jsonPath("$.rowVersion").value(0));
         String window = str(created, "$.id");
 
-        String update = "{\"name\":\"Salon\",\"quantity\":2,\"design\":" + design + ",\"bom\":" + BOM + ",\"rowVersion\":0}";
+        String update = "{\"name\":\"Salon\",\"quantity\":2,\"design\":" + design + ",\"bom\":" + TestData.BOM + ",\"rowVersion\":0}";
         call(put("/api/v1/windows/" + window), t1, update)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.unitPrice").value(4816.31))

@@ -109,6 +109,17 @@ public class WindowService {
         pricingService.calculateProjectPrice(project.getId());
     }
 
+    /** İçe aktarmada: kesim listesini doğrula, kaydet ve güncel katalogdan unitPrice hesapla. */
+    @Transactional
+    public void applyBomAndPrice(Long windowId, List<Map<String, Object>> bom, User user) {
+        WindowUnit unit = load(windowId, user);
+        bomPricer.validate(bom);
+        unit.setBomSnapshot(bom);
+        unit.setUnitPrice(bom == null ? null
+                : bomPricer.price(guard.companyId(user), unit.getSeries(), bom).total());
+        windowUnitRepository.saveAndFlush(unit);
+    }
+
     /** Kayıtlı kesim listesini GÜNCEL katalog fiyatlarıyla fiyatlar (kayıttaki unitPrice değişmez). */
     @Transactional(readOnly = true)
     public QuoteDto quote(Long id, User user) {

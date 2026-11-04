@@ -20,4 +20,6 @@ public interface SeriesRepository extends JpaRepository<Series, Long> {
     List<Series> findByCompanyIdIsNullOrderByIdAsc();
 
     Optional<Series> findFirstByCompanyIdAndActiveTrueOrderByIdAsc(Long companyId);
+
+    Optional<Series> findFirstByCompanyIdAndName(Long companyId, String name);
 }

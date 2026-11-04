@@ -7,6 +7,7 @@ import lombok.Setter;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,6 +21,30 @@ public class Company {
     private String name;        // Şirket Adı (Örn: ABC Pencere Sistemleri)
     private String taxNumber;   // Vergi No (Opsiyonel)
     private String address;
+
+    @Column(length = 50)
+    private String phone;
+
+    @Column(length = 200)
+    private String email;
+
+    @Column(name = "tax_office", length = 120)
+    private String taxOffice;
+
+    @Column(name = "vat_rate", nullable = false, precision = 5, scale = 2)
+    private BigDecimal vatRate = new BigDecimal("20.00");
+
+    @Column(name = "default_discount_pct", nullable = false, precision = 5, scale = 2)
+    private BigDecimal defaultDiscountPct = BigDecimal.ZERO.setScale(2);
+
+    @Column(nullable = false, length = 8)
+    private String currency = "TRY";
+
+    @Column(name = "quote_note", length = 2000)
+    private String quoteNote;
+
+    @Column(name = "quote_validity_days", nullable = false)
+    private Integer quoteValidityDays = 15;
 
     // Şirkete bağlı çalışanlar
     @OneToMany(mappedBy = "company", cascade = CascadeType.ALL)
