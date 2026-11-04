@@ -1,9 +1,10 @@
 package com.atablood.iWindoor_api.dto.catalog;
 
 import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 
-/** Boş bırakılan alanlar değişmez. Hepsi mm. */
+/** Boş bırakılan alanlar değişmez. Hepsi mm (maxFixedGlassArea m2). */
 public record SeriesGeometryRequest(
         @PositiveOrZero @DecimalMax("300") Double frameFace,
         @PositiveOrZero @DecimalMax("300") Double sashFace,
@@ -16,6 +17,12 @@ public record SeriesGeometryRequest(
         @PositiveOrZero @DecimalMax("50") Double weldAllowance,
         @PositiveOrZero @DecimalMax("50") Double mullionEndAllowance,
         @PositiveOrZero @DecimalMax("200") Double slideInterlock,
-        @PositiveOrZero @DecimalMax("100") Double duplexWidth
+        @PositiveOrZero @DecimalMax("100") Double duplexWidth,
+        @Positive @DecimalMax("5000") Double minSashWidth,
+        @Positive @DecimalMax("5000") Double minSashHeight,
+        @Positive @DecimalMax("10000") Double maxSashWidth,
+        @Positive @DecimalMax("10000") Double maxSashHeight,
+        @Positive @DecimalMax("10000") Double maxSlideSashWidth,
+        @Positive @DecimalMax("100") Double maxFixedGlassArea
 ) {
 }

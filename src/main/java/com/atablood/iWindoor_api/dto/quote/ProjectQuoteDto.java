@@ -2,6 +2,7 @@ package com.atablood.iWindoor_api.dto.quote;
 
 import com.atablood.iWindoor_api.dto.company.CompanyDto;
 import com.atablood.iWindoor_api.dto.window.QuoteLine;
+import com.atablood.iWindoor_api.entity.Project;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -25,7 +26,19 @@ public record ProjectQuoteDto(
         BigDecimal vatAmount,
         BigDecimal grandTotal
 ) {
-    public record ProjectInfo(Long id, String name, String description) {
+    public record ProjectInfo(
+            Long id,
+            String name,
+            String description,
+            String customerName,
+            String customerPhone,
+            String customerEmail,
+            String customerAddress
+    ) {
+        public static ProjectInfo of(Project p) {
+            return new ProjectInfo(p.getId(), p.getName(), p.getDescription(),
+                    p.getCustomerName(), p.getCustomerPhone(), p.getCustomerEmail(), p.getCustomerAddress());
+        }
     }
 
     public record WindowQuoteLine(

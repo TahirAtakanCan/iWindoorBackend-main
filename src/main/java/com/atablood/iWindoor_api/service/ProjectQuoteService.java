@@ -107,7 +107,7 @@ public class ProjectQuoteService {
                 LocalDate.now().plusDays(validityDays),
                 company.getCurrency() == null ? "TRY" : company.getCurrency(),
                 CompanyDto.of(company),
-                new ProjectInfo(project.getId(), project.getName(), project.getDescription()),
+                ProjectInfo.of(project),
                 windows,
                 materials,
                 subtotal,

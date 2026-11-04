@@ -12,7 +12,14 @@ public record ProjectFileDto(
         ProjectPart project,
         List<WindowPart> windows
 ) {
-    public record ProjectPart(String name, String description) {
+    public record ProjectPart(
+            String name,
+            String description,
+            String customerName,
+            String customerPhone,
+            String customerEmail,
+            String customerAddress
+    ) {
     }
 
     public record WindowPart(

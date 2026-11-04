@@ -26,6 +26,18 @@ public class Project {
 
     private String description;
 
+    @Column(name = "customer_name", length = 200)
+    private String customerName;
+
+    @Column(name = "customer_phone", length = 50)
+    private String customerPhone;
+
+    @Column(name = "customer_email", length = 200)
+    private String customerEmail;
+
+    @Column(name = "customer_address", length = 500)
+    private String customerAddress;
+
     // Proje toplam tutarı (Hesaplama sonucu güncellenir)
     @Column(name = "total_price")
     private BigDecimal totalPrice;

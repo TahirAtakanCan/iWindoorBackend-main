@@ -51,6 +51,12 @@ public class CatalogProvisioningService {
             s.setMullionEndAllowanceMm(t.getMullionEndAllowanceMm());
             s.setSlideInterlockMm(t.getSlideInterlockMm());
             s.setDuplexWidthMm(t.getDuplexWidthMm());
+            s.setMinSashWidthMm(t.getMinSashWidthMm());
+            s.setMinSashHeightMm(t.getMinSashHeightMm());
+            s.setMaxSashWidthMm(t.getMaxSashWidthMm());
+            s.setMaxSashHeightMm(t.getMaxSashHeightMm());
+            s.setMaxSlideSashWidthMm(t.getMaxSlideSashWidthMm());
+            s.setMaxFixedGlassAreaM2(t.getMaxFixedGlassAreaM2());
             s.setCompanyId(companyId);
             copies.put(t.getId(), seriesRepository.save(s));
         }

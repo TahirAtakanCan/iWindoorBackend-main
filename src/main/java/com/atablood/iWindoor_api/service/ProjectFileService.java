@@ -76,7 +76,13 @@ public class ProjectFileService {
                 FORMAT,
                 VERSION,
                 Instant.now(),
-                new ProjectPart(project.getName(), project.getDescription()),
+                new ProjectPart(
+                        project.getName(),
+                        project.getDescription(),
+                        project.getCustomerName(),
+                        project.getCustomerPhone(),
+                        project.getCustomerEmail(),
+                        project.getCustomerAddress()),
                 windows
         );
 
@@ -112,8 +118,16 @@ public class ProjectFileService {
         String importName = baseName.length() + suffix.length() > 200
                 ? baseName.substring(0, Math.max(0, 200 - suffix.length())) + suffix
                 : baseName + suffix;
+        ProjectPart src = file.project();
         Project project = projectService.createProject(
-                new ProjectRequest(importName, file.project().description()), user);
+                new ProjectRequest(
+                        importName,
+                        src.description(),
+                        src.customerName(),
+                        src.customerPhone(),
+                        src.customerEmail(),
+                        src.customerAddress()),
+                user);
 
         Series defaultSeries = catalogService.defaultSeries(companyId);
 
@@ -160,8 +174,9 @@ public class ProjectFileService {
 
     static String asciiSlug(String name) {
         if (name == null || name.isBlank()) return "project";
+        String transliterated = transliterateTurkish(name).toLowerCase(Locale.ROOT);
         StringBuilder sb = new StringBuilder();
-        for (char c : name.toLowerCase(Locale.ROOT).toCharArray()) {
+        for (char c : transliterated.toCharArray()) {
             if (c >= 'a' && c <= 'z' || c >= '0' && c <= '9') {
                 sb.append(c);
             } else if (c == ' ' || c == '-' || c == '_') {
@@ -172,4 +187,22 @@ public class ProjectFileService {
         while (!sb.isEmpty() && sb.charAt(sb.length() - 1) == '-') sb.deleteCharAt(sb.length() - 1);
         return sb.isEmpty() ? "project" : sb.toString();
     }
+
+    private static String transliterateTurkish(String input) {
+        StringBuilder out = new StringBuilder(input.length());
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            out.append(switch (c) {
+                case 'ç', 'Ç' -> 'c';
+                case 'ğ', 'Ğ' -> 'g';
+                case 'ı', 'İ' -> 'i';
+                case 'ö', 'Ö' -> 'o';
+                case 'ş', 'Ş' -> 's';
+                case 'ü', 'Ü' -> 'u';
+                default -> c;
+            });
+        }
+        return out.toString();
+    }
 }
+

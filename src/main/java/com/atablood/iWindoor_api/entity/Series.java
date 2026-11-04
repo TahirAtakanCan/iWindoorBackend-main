@@ -69,4 +69,23 @@ public class Series {
 
     @Column(name = "duplex_width_mm", nullable = false)
     private Double duplexWidthMm = 18.0;        // dubleks çıta genişliği
+
+    // --- Kanat / cam sınırları (mobil editör uyarıları) ---
+    @Column(name = "min_sash_width_mm", nullable = false)
+    private Double minSashWidthMm = 350.0;
+
+    @Column(name = "min_sash_height_mm", nullable = false)
+    private Double minSashHeightMm = 350.0;
+
+    @Column(name = "max_sash_width_mm", nullable = false)
+    private Double maxSashWidthMm = 1400.0;
+
+    @Column(name = "max_sash_height_mm", nullable = false)
+    private Double maxSashHeightMm = 2400.0;
+
+    @Column(name = "max_slide_sash_width_mm", nullable = false)
+    private Double maxSlideSashWidthMm = 2000.0;
+
+    @Column(name = "max_fixed_glass_area_m2", nullable = false)
+    private Double maxFixedGlassAreaM2 = 6.0;
 }

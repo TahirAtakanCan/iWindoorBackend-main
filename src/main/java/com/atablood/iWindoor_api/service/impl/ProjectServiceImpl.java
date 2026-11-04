@@ -31,8 +31,7 @@ public class ProjectServiceImpl implements ProjectService {
     public Project createProject(ProjectRequest request, User currentUser) {
         guard.companyId(currentUser);
         Project project = new Project();
-        project.setName(request.name());
-        project.setDescription(request.description());
+        applyRequest(project, request);
         project.setCreatedBy(currentUser);
         return projectRepository.save(project);
     }
@@ -41,9 +40,17 @@ public class ProjectServiceImpl implements ProjectService {
     @Transactional
     public Project updateProject(Long id, ProjectRequest request, User currentUser) {
         Project project = getProject(id, currentUser);
+        applyRequest(project, request);
+        return projectRepository.save(project);
+    }
+
+    private static void applyRequest(Project project, ProjectRequest request) {
         project.setName(request.name());
         project.setDescription(request.description());
-        return projectRepository.save(project);
+        project.setCustomerName(request.customerName());
+        project.setCustomerPhone(request.customerPhone());
+        project.setCustomerEmail(request.customerEmail());
+        project.setCustomerAddress(request.customerAddress());
     }
 
     @Override

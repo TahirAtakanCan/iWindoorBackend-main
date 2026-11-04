@@ -95,6 +95,12 @@ public class CatalogServiceImpl implements CatalogService {
         set(g.mullionEndAllowance(), s::setMullionEndAllowanceMm);
         set(g.slideInterlock(), s::setSlideInterlockMm);
         set(g.duplexWidth(), s::setDuplexWidthMm);
+        set(g.minSashWidth(), s::setMinSashWidthMm);
+        set(g.minSashHeight(), s::setMinSashHeightMm);
+        set(g.maxSashWidth(), s::setMaxSashWidthMm);
+        set(g.maxSashHeight(), s::setMaxSashHeightMm);
+        set(g.maxSlideSashWidth(), s::setMaxSlideSashWidthMm);
+        set(g.maxFixedGlassArea(), s::setMaxFixedGlassAreaM2);
     }
 
     private static void set(Double v, Consumer<Double> setter) {

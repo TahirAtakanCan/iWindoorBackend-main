@@ -2,7 +2,7 @@ package com.atablood.iWindoor_api.dto.catalog;
 
 import com.atablood.iWindoor_api.entity.Series;
 
-/** Alan adları Dart tarafındaki SeriesGeometry.fromJson ile birebir aynıdır. Hepsi mm. */
+/** Alan adları Dart tarafındaki SeriesGeometry.fromJson ile birebir aynıdır. Hepsi mm (alan m2 hariç). */
 public record SeriesGeometryDto(
         String id,
         double frameFace,
@@ -16,12 +16,20 @@ public record SeriesGeometryDto(
         double weldAllowance,
         double mullionEndAllowance,
         double slideInterlock,
-        double duplexWidth
+        double duplexWidth,
+        double minSashWidth,
+        double minSashHeight,
+        double maxSashWidth,
+        double maxSashHeight,
+        double maxSlideSashWidth,
+        double maxFixedGlassArea
 ) {
     public static SeriesGeometryDto of(Series s) {
         return new SeriesGeometryDto(String.valueOf(s.getId()), s.getFrameFaceMm(), s.getSashFaceMm(), s.getMullionFaceMm(),
                 s.getBeadFaceMm(), s.getSashLapMm(), s.getGlassRebateFrameMm(), s.getGlassRebateSashMm(),
                 s.getGlassRebateMullionMm(), s.getWeldAllowanceMm(), s.getMullionEndAllowanceMm(),
-                s.getSlideInterlockMm(), s.getDuplexWidthMm());
+                s.getSlideInterlockMm(), s.getDuplexWidthMm(),
+                s.getMinSashWidthMm(), s.getMinSashHeightMm(), s.getMaxSashWidthMm(), s.getMaxSashHeightMm(),
+                s.getMaxSlideSashWidthMm(), s.getMaxFixedGlassAreaM2());
     }
 }
