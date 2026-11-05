@@ -3,6 +3,7 @@ package com.atablood.iWindoor_api.config;
 import com.atablood.iWindoor_api.entity.*;
 import com.atablood.iWindoor_api.repository.AccessoryRepository;
 import com.atablood.iWindoor_api.repository.GlassRepository;
+import com.atablood.iWindoor_api.repository.HardwareRuleRepository;
 import com.atablood.iWindoor_api.repository.ProfileRepository;
 import com.atablood.iWindoor_api.repository.SeriesRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class DataSeeder implements CommandLineRunner {
     private final ProfileRepository profileRepository;
     private final GlassRepository glassRepository;
     private final AccessoryRepository accessoryRepository;
+    private final HardwareRuleRepository hardwareRuleRepository;
 
     @Override
     @Transactional
@@ -63,6 +65,44 @@ public class DataSeeder implements CommandLineRunner {
         accessory("DUPLEX", "Dubleks çıta", AccessoryUnit.METER, 45);
         accessory("KOL-STD", "Pencere kolu", AccessoryUnit.PIECE, 250);
         accessory("CONTA-EPDM", "EPDM conta", AccessoryUnit.METER, 12);
+        accessory("MENTESE-SET", "Menteşe takımı", AccessoryUnit.SET, 180);
+        accessory("VASISTAS-SET", "Vasistas makas takımı", AccessoryUnit.SET, 420);
+        accessory("CIFT-ACILIM-SET", "Çift açılım takımı", AccessoryUnit.SET, 650);
+        accessory("SURME-SET", "Sürme makara takımı", AccessoryUnit.SET, 380);
+        accessory("SURME-KOL", "Sürme kolu", AccessoryUnit.PIECE, 220);
+
+        seedHardwareRules();
+    }
+
+    private void seedHardwareRules() {
+        rule("TURN", "KOL-STD", "PER_SASH", 1, 10);
+        rule("TURN", "MENTESE-SET", "PER_SASH", 1, 20);
+        rule("TURN", "CONTA-EPDM", "PER_PERIMETER_METER", 1, 30);
+
+        rule("TILT", "KOL-STD", "PER_SASH", 1, 10);
+        rule("TILT", "VASISTAS-SET", "PER_SASH", 1, 20);
+        rule("TILT", "CONTA-EPDM", "PER_PERIMETER_METER", 1, 30);
+
+        rule("TILT_TURN", "KOL-STD", "PER_SASH", 1, 10);
+        rule("TILT_TURN", "CIFT-ACILIM-SET", "PER_SASH", 1, 20);
+        rule("TILT_TURN", "CONTA-EPDM", "PER_PERIMETER_METER", 1, 30);
+
+        rule("SLIDE", "SURME-KOL", "PER_SASH", 1, 10);
+        rule("SLIDE", "SURME-SET", "PER_SASH", 1, 20);
+        rule("SLIDE", "CONTA-EPDM", "PER_PERIMETER_METER", 1, 30);
+    }
+
+    private void rule(String kind, String accessoryCode, String qtyType, double qty, int sortOrder) {
+        if (hardwareRuleRepository.existsByCompanyIdIsNullAndKindAndAccessoryCodeAndSeriesIdIsNull(kind, accessoryCode)) {
+            return;
+        }
+        HardwareRule r = new HardwareRule();
+        r.setKind(kind);
+        r.setAccessoryCode(accessoryCode);
+        r.setQtyType(qtyType);
+        r.setQty(BigDecimal.valueOf(qty));
+        r.setSortOrder(sortOrder);
+        hardwareRuleRepository.save(r);
     }
 
     private void profile(Series s, String code, String name, ProfileType type, double face, double price,

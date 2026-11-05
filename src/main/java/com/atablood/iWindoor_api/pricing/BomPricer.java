@@ -6,6 +6,7 @@ import com.atablood.iWindoor_api.entity.*;
 import com.atablood.iWindoor_api.exception.BadRequestException;
 import com.atablood.iWindoor_api.repository.AccessoryRepository;
 import com.atablood.iWindoor_api.repository.GlassRepository;
+import com.atablood.iWindoor_api.repository.HardwareRuleRepository;
 import com.atablood.iWindoor_api.repository.ProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ import java.util.*;
  *  {"group":"DUPLEX","length":458,"qty":1}                                  aksesuar kodu DUPLEX (metre)
  *  {"group":"GLASS","glassCode":"4+16+4","w":408,"h":1086,"qty":1}
  *  {"group":"PANEL","glassCode":"PANEL-24","w":408,"h":1086,"qty":1}
+ *  {"group":"HARDWARE","kind":"TILT_TURN","w":536,"h":1214,"qty":1}         donanım kurallarıyla aksesuara çevrilir
  * </pre>
  */
 @Service
@@ -33,12 +35,14 @@ public class BomPricer {
 
     public static final int MAX_LINES = 2000;
     public static final String DUPLEX_ACCESSORY_CODE = "DUPLEX";
-    private static final Set<String> GROUPS = Set.of("PROFILE", "BEAD", "DUPLEX", "GLASS", "PANEL");
+    private static final Set<String> GROUPS = Set.of("PROFILE", "BEAD", "DUPLEX", "GLASS", "PANEL", "HARDWARE");
     private static final Set<String> ROLES = Set.of("FRAME", "SASH", "MULLION", "SLIDE_SASH", "ADAPTER", "EXTENSION");
+    private static final Set<String> HARDWARE_KINDS = Set.of("TURN", "TILT", "TILT_TURN", "SLIDE");
 
     private final ProfileRepository profileRepository;
     private final GlassRepository glassRepository;
     private final AccessoryRepository accessoryRepository;
+    private final HardwareRuleRepository hardwareRuleRepository;
 
     /** Satırların biçimini kontrol eder; hatalıysa BadRequestException (code=INVALID_BOM). */
     public void validate(List<Map<String, Object>> bom) {
@@ -68,7 +72,14 @@ public class BomPricer {
                         errors.add(err(p + ".role", "Şunlardan biri olmalı: " + new TreeSet<>(ROLES)));
                     }
                 }
-                default -> {
+                case "HARDWARE" -> {
+                    if (!(l.get("kind") instanceof String kind) || !HARDWARE_KINDS.contains(kind)) {
+                        errors.add(err(p + ".kind", "Şunlardan biri olmalı: " + new TreeSet<>(HARDWARE_KINDS)));
+                    }
+                    if (!positive(l.get("w"), 12000)) errors.add(err(p + ".w", "0-12000 mm arası olmalı."));
+                    if (!positive(l.get("h"), 12000)) errors.add(err(p + ".h", "0-12000 mm arası olmalı."));
+                }
+                default -> { // GLASS, PANEL
                     if (!positive(l.get("w"), 12000)) errors.add(err(p + ".w", "0-12000 mm arası olmalı."));
                     if (!positive(l.get("h"), 12000)) errors.add(err(p + ".h", "0-12000 mm arası olmalı."));
                     if (!(l.get("glassCode") instanceof String gc) || gc.isBlank()) {
@@ -83,9 +94,9 @@ public class BomPricer {
     /** Bir adet pencerenin kesim listesini fiyatlar. Bulunamayan malzemeler 0 fiyatla ve uyarıyla döner. */
     public PricedBom price(Long companyId, Series series, List<Map<String, Object>> bom) {
         validate(bom);
-        Resolver r = new Resolver(companyId, series);
-        Map<String, Acc> acc = new LinkedHashMap<>();
         Set<String> warnings = new LinkedHashSet<>();
+        Resolver r = new Resolver(companyId, series, warnings);
+        Map<String, Acc> acc = new LinkedHashMap<>();
         String currency = "TRY";
 
         for (Map<String, Object> l : bom == null ? List.<Map<String, Object>>of() : bom) {
@@ -117,6 +128,7 @@ public class BomPricer {
                     add(acc, group, DUPLEX_ACCESSORY_CODE, a == null ? "Dubleks çıta" : a.getName(), m, "m",
                             a == null ? BigDecimal.ZERO : a.getPrice());
                 }
+                case "HARDWARE" -> applyHardware(r, acc, warnings, l, qty);
                 default -> { // GLASS, PANEL
                     String code = (String) l.get("glassCode");
                     Glass g = r.glass(code);
@@ -136,6 +148,41 @@ public class BomPricer {
             total = total.add(lineTotal);
         }
         return new PricedBom(lines, total.setScale(2, RoundingMode.HALF_UP), currency, new ArrayList<>(warnings));
+    }
+
+    private void applyHardware(Resolver r, Map<String, Acc> acc, Set<String> warnings, Map<String, Object> line, int lineQty) {
+        String kind = (String) line.get("kind");
+        double w = num(line.get("w"));
+        double h = num(line.get("h"));
+        List<HardwareRule> rules = r.hardwareRules(kind);
+        if (rules.isEmpty()) {
+            warnings.add("Donanım kuralı yok: " + kind);
+            return;
+        }
+        for (HardwareRule rule : rules) {
+            double quantity;
+            if ("PER_PERIMETER_METER".equals(rule.getQtyType())) {
+                quantity = rule.getQty().doubleValue() * 2.0 * (w + h) / 1000.0 * lineQty;
+            } else { // PER_SASH
+                quantity = rule.getQty().doubleValue() * lineQty;
+            }
+            Accessory a = r.accessory(rule.getAccessoryCode());
+            if (a == null) {
+                warnings.add("Aksesuar bulunamadı: " + rule.getAccessoryCode());
+                add(acc, "ACCESSORY", rule.getAccessoryCode(), rule.getAccessoryCode(), quantity, "adet", BigDecimal.ZERO);
+            } else {
+                add(acc, "ACCESSORY", a.getCode(), a.getName(), quantity, unitLabel(a.getUnit()), a.getPrice());
+            }
+        }
+    }
+
+    private static String unitLabel(AccessoryUnit unit) {
+        if (unit == null) return "adet";
+        return switch (unit) {
+            case PIECE -> "adet";
+            case SET -> "takım";
+            case METER -> "m";
+        };
     }
 
     private static void add(Map<String, Acc> acc, String group, String code, String name, double q, String unit, BigDecimal unitPrice) {
@@ -179,14 +226,19 @@ public class BomPricer {
     /** Katalog sorgularını bir fiyatlama boyunca önbellekler. */
     private final class Resolver {
         private final Long companyId;
+        private final Long seriesId;
+        private final Set<String> warnings;
         private final List<Profile> seriesProfiles;
         private final Map<String, Optional<Glass>> glasses = new HashMap<>();
         private final Map<String, Optional<Accessory>> accessories = new HashMap<>();
+        private final Map<String, List<HardwareRule>> hardwareByKind = new HashMap<>();
 
-        Resolver(Long companyId, Series series) {
+        Resolver(Long companyId, Series series, Set<String> warnings) {
             this.companyId = companyId;
+            this.seriesId = series == null ? null : series.getId();
+            this.warnings = warnings;
             this.seriesProfiles = series == null ? List.of()
-                    : profileRepository.findBySeries_IdOrderByIdAsc(series.getId()).stream().filter(Profile::isActive).toList();
+                    : profileRepository.findBySeries_IdOrderByIdAsc(series.getId());
         }
 
         Profile profile(ProfileType type) {
@@ -205,15 +257,41 @@ public class BomPricer {
 
         Glass glass(String code) {
             if (code == null) return null;
-            return glasses.computeIfAbsent(code, c -> glassRepository.findFirstByCompanyIdAndCode(companyId, c)).orElse(null);
+            Glass g = glasses.computeIfAbsent(code, c -> glassRepository.findFirstByCompanyIdAndCode(companyId, c)).orElse(null);
+            if (g != null && !g.isActive()) warnings.add("Pasif kayıt: " + g.getCode());
+            return g;
         }
 
         Accessory accessory(String code) {
-            return accessories.computeIfAbsent(code, c -> accessoryRepository.findFirstByCompanyIdAndCode(companyId, c)).orElse(null);
+            Accessory a = accessories.computeIfAbsent(code, c -> accessoryRepository.findFirstByCompanyIdAndCode(companyId, c)).orElse(null);
+            if (a != null && !a.isActive()) warnings.add("Pasif kayıt: " + a.getCode());
+            return a;
         }
 
+        List<HardwareRule> hardwareRules(String kind) {
+            return hardwareByKind.computeIfAbsent(kind, k -> {
+                if (seriesId != null) {
+                    List<HardwareRule> seriesRules = hardwareRuleRepository
+                            .findByCompanyIdAndSeriesIdAndKindOrderBySortOrderAscIdAsc(companyId, seriesId, k);
+                    if (!seriesRules.isEmpty()) return seriesRules;
+                }
+                return hardwareRuleRepository
+                        .findByCompanyIdAndSeriesIdIsNullAndKindOrderBySortOrderAscIdAsc(companyId, k);
+            });
+        }
+
+        /** Önce aktif varsayılan / aktif ilk; aktif yoksa pasifler arasından + uyarı. */
         private Profile pick(List<Profile> list) {
-            return list.stream().filter(Profile::isDefaultForType).findFirst().orElse(list.isEmpty() ? null : list.get(0));
+            if (list.isEmpty()) return null;
+            List<Profile> active = list.stream().filter(Profile::isActive).toList();
+            Profile chosen;
+            if (!active.isEmpty()) {
+                chosen = active.stream().filter(Profile::isDefaultForType).findFirst().orElse(active.get(0));
+            } else {
+                chosen = list.stream().filter(Profile::isDefaultForType).findFirst().orElse(list.get(0));
+                warnings.add("Pasif kayıt: " + chosen.getCode());
+            }
+            return chosen;
         }
     }
 }

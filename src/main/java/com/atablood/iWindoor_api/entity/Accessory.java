@@ -30,4 +30,7 @@ public class Accessory {
 
     @Column(name = "company_id")
     private Long companyId;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean active = true;
 }

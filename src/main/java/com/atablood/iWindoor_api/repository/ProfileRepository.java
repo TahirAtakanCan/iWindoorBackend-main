@@ -20,9 +20,13 @@ public interface ProfileRepository extends JpaRepository<Profile, Long> {
 
     List<Profile> findByCompanyIdOrderByIdAsc(Long companyId);
 
+    List<Profile> findByCompanyIdAndActiveTrueOrderByIdAsc(Long companyId);
+
     List<Profile> findByCompanyIdAndTypeOrderByIdAsc(Long companyId, ProfileType type);
 
     List<Profile> findByCompanyIdIsNullOrderByIdAsc();
+
+    List<Profile> findBySeries_IdAndTypeAndCompanyId(Long seriesId, ProfileType type, Long companyId);
 
     boolean existsByCompanyIdAndCode(Long companyId, String code);
 }

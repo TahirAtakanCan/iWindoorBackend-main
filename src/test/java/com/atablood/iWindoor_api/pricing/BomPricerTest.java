@@ -6,6 +6,7 @@ import com.atablood.iWindoor_api.entity.*;
 import com.atablood.iWindoor_api.exception.BadRequestException;
 import com.atablood.iWindoor_api.repository.AccessoryRepository;
 import com.atablood.iWindoor_api.repository.GlassRepository;
+import com.atablood.iWindoor_api.repository.HardwareRuleRepository;
 import com.atablood.iWindoor_api.repository.ProfileRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,7 @@ class BomPricerTest {
     private ProfileRepository profiles;
     private GlassRepository glasses;
     private AccessoryRepository accessories;
+    private HardwareRuleRepository hardwareRules;
     private BomPricer pricer;
     private Series series;
 
@@ -41,12 +43,32 @@ class BomPricerTest {
         return p;
     }
 
+    private static Accessory accessory(String code, String name, AccessoryUnit unit, double price) {
+        Accessory a = new Accessory();
+        a.setCode(code);
+        a.setName(name);
+        a.setUnit(unit);
+        a.setPrice(BigDecimal.valueOf(price));
+        return a;
+    }
+
+    private static HardwareRule rule(String kind, String code, String qtyType, double qty, int sort) {
+        HardwareRule r = new HardwareRule();
+        r.setKind(kind);
+        r.setAccessoryCode(code);
+        r.setQtyType(qtyType);
+        r.setQty(BigDecimal.valueOf(qty));
+        r.setSortOrder(sort);
+        return r;
+    }
+
     @BeforeEach
     void setUp() {
         profiles = mock(ProfileRepository.class);
         glasses = mock(GlassRepository.class);
         accessories = mock(AccessoryRepository.class);
-        pricer = new BomPricer(profiles, glasses, accessories);
+        hardwareRules = mock(HardwareRuleRepository.class);
+        pricer = new BomPricer(profiles, glasses, accessories, hardwareRules);
         series = new Series();
         series.setId(1L);
         when(profiles.findBySeries_IdOrderByIdAsc(1L)).thenReturn(List.of(
@@ -70,6 +92,10 @@ class BomPricerTest {
         when(glasses.findFirstByCompanyIdAndCode(eq(COMPANY), argThat(c -> !"4+16+4".equals(c) && !"4".equals(c))))
                 .thenReturn(Optional.empty());
         when(accessories.findFirstByCompanyIdAndCode(anyLong(), anyString())).thenReturn(Optional.empty());
+        when(hardwareRules.findByCompanyIdAndSeriesIdAndKindOrderBySortOrderAscIdAsc(anyLong(), anyLong(), anyString()))
+                .thenReturn(List.of());
+        when(hardwareRules.findByCompanyIdAndSeriesIdIsNullAndKindOrderBySortOrderAscIdAsc(anyLong(), anyString()))
+                .thenReturn(List.of());
     }
 
     private static Map<String, Object> bar(String group, String role, double len, int qty) {
@@ -86,18 +112,20 @@ class BomPricerTest {
         return new LinkedHashMap<>(Map.of("group", "GLASS", "glassCode", code, "w", w, "h", h, "qty", qty));
     }
 
-    /** Prototipteki 1800x1700 pencerenin kesim listesi; beklenen 4816,31 TL elle hesaplandı. */
-    @Test
-    void pricesSampleWindowExactly() {
-        List<Map<String, Object>> bom = List.of(
+    private static List<Map<String, Object>> sampleBom() {
+        return List.of(
                 bar("PROFILE", "FRAME", 1806, 2), bar("PROFILE", "FRAME", 1706, 2),
                 bar("PROFILE", "MULLION", 1682, 1), bar("PROFILE", "MULLION", 1204, 2), bar("PROFILE", "MULLION", 304, 2),
                 bar("PROFILE", "SASH", 542, 2), bar("PROFILE", "SASH", 1220, 2),
                 bar("BEAD", null, 1198, 4), bar("BEAD", null, 1058, 2), bar("BEAD", null, 520, 2),
                 bar("BEAD", null, 498, 8), bar("BEAD", null, 380, 2), bar("BEAD", null, 298, 6),
                 sheet("4+16+4", 548, 326, 1), sheet("4+16+4", 526, 326, 2), sheet("4+16+4", 526, 1226, 2), sheet("4+16+4", 408, 1086, 1));
+    }
 
-        PricedBom p = pricer.price(COMPANY, series, bom);
+    /** Prototipteki 1800x1700 pencerenin kesim listesi; beklenen 4816,31 TL elle hesaplandı. */
+    @Test
+    void pricesSampleWindowExactly() {
+        PricedBom p = pricer.price(COMPANY, series, sampleBom());
 
         assertThat(p.warnings()).isEmpty();
         assertThat(p.total()).isEqualByComparingTo("4816.31");
@@ -108,6 +136,52 @@ class BomPricerTest {
         assertThat(byCode.get("KN70-78")).isEqualByComparingTo("687.18");   // 3,524 m x 195
         assertThat(byCode.get("CT70-24")).isEqualByComparingTo("506.80");   // 14,48 m x 35 (24 mm cam -> 22-26 aralığı)
         assertThat(byCode.get("4+16+4")).isEqualByComparingTo("1465.39");   // 2,25444 m2 x 650
+    }
+
+    @Test
+    void tiltTurnHardwareAddsAccessories() {
+        when(hardwareRules.findByCompanyIdAndSeriesIdIsNullAndKindOrderBySortOrderAscIdAsc(COMPANY, "TILT_TURN"))
+                .thenReturn(List.of(
+                        rule("TILT_TURN", "KOL-STD", "PER_SASH", 1, 10),
+                        rule("TILT_TURN", "CIFT-ACILIM-SET", "PER_SASH", 1, 20),
+                        rule("TILT_TURN", "CONTA-EPDM", "PER_PERIMETER_METER", 1, 30)));
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "KOL-STD"))
+                .thenReturn(Optional.of(accessory("KOL-STD", "Pencere kolu", AccessoryUnit.PIECE, 250)));
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "CIFT-ACILIM-SET"))
+                .thenReturn(Optional.of(accessory("CIFT-ACILIM-SET", "Çift açılım takımı", AccessoryUnit.SET, 650)));
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "CONTA-EPDM"))
+                .thenReturn(Optional.of(accessory("CONTA-EPDM", "EPDM conta", AccessoryUnit.METER, 12)));
+
+        Map<String, Object> hw = new LinkedHashMap<>();
+        hw.put("group", "HARDWARE");
+        hw.put("kind", "TILT_TURN");
+        hw.put("w", 536);
+        hw.put("h", 1214);
+        hw.put("qty", 1);
+
+        PricedBom onlyHw = pricer.price(COMPANY, series, List.of(hw));
+        Map<String, QuoteLine> byCode = new HashMap<>();
+        for (QuoteLine l : onlyHw.lines()) byCode.put(l.code(), l);
+        assertThat(byCode.get("KOL-STD").quantity()).isEqualTo(1.0);
+        assertThat(byCode.get("KOL-STD").unit()).isEqualTo("adet");
+        assertThat(byCode.get("KOL-STD").total()).isEqualByComparingTo("250.00");
+        assertThat(byCode.get("CIFT-ACILIM-SET").unit()).isEqualTo("takım");
+        assertThat(byCode.get("CIFT-ACILIM-SET").total()).isEqualByComparingTo("650.00");
+        assertThat(byCode.get("CONTA-EPDM").quantity()).isEqualTo(3.5);
+        assertThat(byCode.get("CONTA-EPDM").unit()).isEqualTo("m");
+        assertThat(byCode.get("CONTA-EPDM").total()).isEqualByComparingTo("42.00");
+        assertThat(onlyHw.total()).isEqualByComparingTo("942.00");
+
+        List<Map<String, Object>> withHw = new ArrayList<>(sampleBom());
+        withHw.add(hw);
+        PricedBom full = pricer.price(COMPANY, series, withHw);
+        assertThat(full.total()).isEqualByComparingTo("5758.31");
+    }
+
+    @Test
+    void bomWithoutHardwareKeepsOldTotal() {
+        PricedBom p = pricer.price(COMPANY, series, sampleBom());
+        assertThat(p.total()).isEqualByComparingTo("4816.31");
     }
 
     @Test

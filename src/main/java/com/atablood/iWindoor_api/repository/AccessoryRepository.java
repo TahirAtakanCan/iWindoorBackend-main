@@ -12,9 +12,13 @@ public interface AccessoryRepository extends JpaRepository<Accessory, Long> {
 
     List<Accessory> findByCompanyIdOrderByIdAsc(Long companyId);
 
+    List<Accessory> findByCompanyIdAndActiveTrueOrderByIdAsc(Long companyId);
+
     List<Accessory> findByCompanyIdIsNullOrderByIdAsc();
 
     Optional<Accessory> findFirstByCompanyIdAndCode(Long companyId, String code);
 
     boolean existsByCompanyIdIsNullAndCode(String code);
+
+    boolean existsByCompanyIdAndCode(Long companyId, String code);
 }

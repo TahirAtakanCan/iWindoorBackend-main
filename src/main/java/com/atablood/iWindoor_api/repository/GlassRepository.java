@@ -12,6 +12,8 @@ public interface GlassRepository extends JpaRepository<Glass, Long> {
 
     List<Glass> findByCompanyIdOrderByIdAsc(Long companyId);
 
+    List<Glass> findByCompanyIdAndIsActiveTrueOrderByIdAsc(Long companyId);
+
     List<Glass> findByCompanyIdIsNullOrderByIdAsc();
 
     Optional<Glass> findFirstByCompanyIdAndCode(Long companyId, String code);

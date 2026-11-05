@@ -31,3 +31,10 @@ build/
 
 ### VS Code ###
 .vscode/
+
+*.sql
+!src/main/resources/db/migration/*.sql
+*.tar.gz
+run_log.txt
+yedek*/
+yedek*.tar.gz
