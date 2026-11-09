@@ -46,6 +46,30 @@ public class Company {
     @Column(name = "quote_validity_days", nullable = false)
     private Integer quoteValidityDays = 15;
 
+    /** Testere kalınlığı (mm), kesim başına. */
+    @Column(name = "saw_kerf_mm", nullable = false, precision = 5, scale = 1)
+    private BigDecimal sawKerfMm = new BigDecimal("4.0");
+
+    /** Boyun her iki ucundan atılan baş/son payı (mm). */
+    @Column(name = "bar_trim_mm", nullable = false, precision = 5, scale = 1)
+    private BigDecimal barTrimMm = new BigDecimal("10.0");
+
+    /** Bu uzunluktan (mm) kısa artık fire sayılır. */
+    @Column(name = "min_offcut_mm", nullable = false)
+    private Integer minOffcutMm = 500;
+
+    @Column(name = "glass_supplier_name", length = 200)
+    private String glassSupplierName;
+
+    @Column(name = "glass_supplier_phone", length = 50)
+    private String glassSupplierPhone;
+
+    @Column(name = "glass_supplier_email", length = 200)
+    private String glassSupplierEmail;
+
+    @Column(name = "glass_order_note", length = 1000)
+    private String glassOrderNote;
+
     // Şirkete bağlı çalışanlar
     @OneToMany(mappedBy = "company", cascade = CascadeType.ALL)
     @JsonManagedReference

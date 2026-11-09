@@ -16,7 +16,14 @@ public record CompanyDto(
         BigDecimal defaultDiscountPct,
         String currency,
         String quoteNote,
-        Integer quoteValidityDays
+        Integer quoteValidityDays,
+        BigDecimal sawKerfMm,
+        BigDecimal barTrimMm,
+        Integer minOffcutMm,
+        String glassSupplierName,
+        String glassSupplierPhone,
+        String glassSupplierEmail,
+        String glassOrderNote
 ) {
     public static CompanyDto of(Company c) {
         return new CompanyDto(
@@ -31,7 +38,14 @@ public record CompanyDto(
                 c.getDefaultDiscountPct(),
                 c.getCurrency(),
                 c.getQuoteNote(),
-                c.getQuoteValidityDays()
+                c.getQuoteValidityDays(),
+                c.getSawKerfMm(),
+                c.getBarTrimMm(),
+                c.getMinOffcutMm(),
+                c.getGlassSupplierName(),
+                c.getGlassSupplierPhone(),
+                c.getGlassSupplierEmail(),
+                c.getGlassOrderNote()
         );
     }
 }

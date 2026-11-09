@@ -9,8 +9,9 @@ public record ProfileDto(Long id, Long seriesId, String code, String name, Profi
                          Integer barLengthMm, Double minGlassMm, Double maxGlassMm, boolean isDefault, boolean active,
                          BigDecimal pricePerMeter, String currency) {
     public static ProfileDto of(Profile p) {
+        Integer bar = p.getBarLengthMm() == null ? 6500 : p.getBarLengthMm();
         return new ProfileDto(p.getId(), p.getSeriesId(), p.getCode(), p.getName(), p.getType(), p.getWidthMm(),
-                p.getBarLengthMm(), p.getMinGlassMm(), p.getMaxGlassMm(), p.isDefaultForType(), p.isActive(),
+                bar, p.getMinGlassMm(), p.getMaxGlassMm(), p.isDefaultForType(), p.isActive(),
                 p.getPricePerMeter(), p.getCurrency());
     }
 }

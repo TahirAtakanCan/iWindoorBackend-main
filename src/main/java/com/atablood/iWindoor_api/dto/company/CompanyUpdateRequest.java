@@ -15,6 +15,13 @@ public record CompanyUpdateRequest(
         @NotNull @DecimalMin("0") @DecimalMax("100") BigDecimal defaultDiscountPct,
         @NotBlank @Pattern(regexp = "^[A-Z]{3}$") String currency,
         @Size(max = 2000) String quoteNote,
-        @NotNull @Min(1) @Max(365) Integer quoteValidityDays
+        @NotNull @Min(1) @Max(365) Integer quoteValidityDays,
+        @NotNull @DecimalMin("0") @DecimalMax("20") BigDecimal sawKerfMm,
+        @NotNull @DecimalMin("0") @DecimalMax("100") BigDecimal barTrimMm,
+        @NotNull @Min(0) @Max(6000) Integer minOffcutMm,
+        @Size(max = 200) String glassSupplierName,
+        @Size(max = 50) String glassSupplierPhone,
+        @Size(max = 200) String glassSupplierEmail,
+        @Size(max = 1000) String glassOrderNote
 ) {
 }

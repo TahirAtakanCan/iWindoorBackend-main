@@ -51,6 +51,13 @@ class CompanyApiIntegrationTest {
         return mvc.perform(b);
     }
 
+    private static final String BASE_UPDATE = """
+            {"name":"Yeni Firma A.Ş.","address":"Ankara","taxNumber":"123","taxOffice":"Çankaya",
+             "phone":"03121234567","email":"info@firma.test","vatRate":18,"defaultDiscountPct":5,
+             "currency":"TRY","quoteNote":"Teşekkürler","quoteValidityDays":30,
+             "sawKerfMm":4,"barTrimMm":10,"minOffcutMm":500,
+             "glassSupplierName":null,"glassSupplierPhone":null,"glassSupplierEmail":null,"glassOrderNote":null}""";
+
     @Test
     void companyAdminCanUpdateDefaults_employeeForbidden() throws Exception {
         String adminToken = register();
@@ -60,13 +67,12 @@ class CompanyApiIntegrationTest {
                 .andExpect(jsonPath("$.vatRate").value(20))
                 .andExpect(jsonPath("$.defaultDiscountPct").value(0))
                 .andExpect(jsonPath("$.currency").value("TRY"))
-                .andExpect(jsonPath("$.quoteValidityDays").value(15));
+                .andExpect(jsonPath("$.quoteValidityDays").value(15))
+                .andExpect(jsonPath("$.sawKerfMm").value(4))
+                .andExpect(jsonPath("$.barTrimMm").value(10))
+                .andExpect(jsonPath("$.minOffcutMm").value(500));
 
-        String update = """
-                {"name":"Yeni Firma A.Ş.","address":"Ankara","taxNumber":"123","taxOffice":"Çankaya",
-                 "phone":"03121234567","email":"info@firma.test","vatRate":18,"defaultDiscountPct":5,
-                 "currency":"TRY","quoteNote":"Teşekkürler","quoteValidityDays":30}""";
-        call(put("/api/v1/company"), adminToken, update)
+        call(put("/api/v1/company"), adminToken, BASE_UPDATE)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Yeni Firma A.Ş."))
                 .andExpect(jsonPath("$.vatRate").value(18))
@@ -83,10 +89,49 @@ class CompanyApiIntegrationTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         String empToken = JsonPath.read(empBody, "$.token");
 
-        call(put("/api/v1/company"), empToken, update).andExpect(status().isForbidden());
+        call(put("/api/v1/company"), empToken, BASE_UPDATE).andExpect(status().isForbidden());
 
         call(get("/api/v1/company"), empToken, null)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.vatRate").value(18));
+    }
+
+    @Test
+    void productionSettingsDefaultsAndValidation() throws Exception {
+        String token = register();
+
+        call(get("/api/v1/company"), token, null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sawKerfMm").value(4))
+                .andExpect(jsonPath("$.barTrimMm").value(10))
+                .andExpect(jsonPath("$.minOffcutMm").value(500));
+
+        String badKerf = """
+                {"name":"Firma","address":null,"taxNumber":null,"taxOffice":null,"phone":null,"email":null,
+                 "vatRate":20,"defaultDiscountPct":0,"currency":"TRY","quoteNote":null,"quoteValidityDays":15,
+                 "sawKerfMm":25,"barTrimMm":10,"minOffcutMm":500,
+                 "glassSupplierName":null,"glassSupplierPhone":null,"glassSupplierEmail":null,"glassOrderNote":null}""";
+        call(put("/api/v1/company"), token, badKerf).andExpect(status().isBadRequest());
+
+        String ok = """
+                {"name":"Firma","address":null,"taxNumber":null,"taxOffice":null,"phone":null,"email":null,
+                 "vatRate":20,"defaultDiscountPct":0,"currency":"TRY","quoteNote":null,"quoteValidityDays":15,
+                 "sawKerfMm":3.5,"barTrimMm":12,"minOffcutMm":800,
+                 "glassSupplierName":"Cam A.Ş.","glassSupplierPhone":"0555","glassSupplierEmail":"cam@test.com",
+                 "glassOrderNote":"Isıcam çıtası gri"}""";
+        call(put("/api/v1/company"), token, ok)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sawKerfMm").value(3.5))
+                .andExpect(jsonPath("$.barTrimMm").value(12))
+                .andExpect(jsonPath("$.minOffcutMm").value(800))
+                .andExpect(jsonPath("$.glassSupplierName").value("Cam A.Ş."))
+                .andExpect(jsonPath("$.glassOrderNote").value("Isıcam çıtası gri"));
+
+        call(get("/api/v1/company"), token, null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sawKerfMm").value(3.5))
+                .andExpect(jsonPath("$.barTrimMm").value(12))
+                .andExpect(jsonPath("$.minOffcutMm").value(800))
+                .andExpect(jsonPath("$.glassSupplierEmail").value("cam@test.com"));
     }
 }

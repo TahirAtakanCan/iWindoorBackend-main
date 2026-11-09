@@ -40,6 +40,13 @@ public class CompanyService {
         c.setCurrency(req.currency());
         c.setQuoteNote(req.quoteNote());
         c.setQuoteValidityDays(req.quoteValidityDays());
+        c.setSawKerfMm(mm1(req.sawKerfMm()));
+        c.setBarTrimMm(mm1(req.barTrimMm()));
+        c.setMinOffcutMm(req.minOffcutMm());
+        c.setGlassSupplierName(req.glassSupplierName());
+        c.setGlassSupplierPhone(req.glassSupplierPhone());
+        c.setGlassSupplierEmail(req.glassSupplierEmail());
+        c.setGlassOrderNote(req.glassOrderNote());
         return CompanyDto.of(companyRepository.save(c));
     }
 
@@ -50,5 +57,9 @@ public class CompanyService {
 
     private static BigDecimal money(BigDecimal v) {
         return v.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal mm1(BigDecimal v) {
+        return v.setScale(1, RoundingMode.HALF_UP);
     }
 }
