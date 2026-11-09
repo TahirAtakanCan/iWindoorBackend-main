@@ -48,6 +48,7 @@ public class ProjectStatusService {
     private final ProjectStatusHistoryRepository historyRepository;
     private final ProjectQuoteService projectQuoteService;
     private final ProjectFinanceService financeService;
+    private final QuoteVersionService quoteVersionService;
     private final AccessGuard guard;
 
     @Transactional
@@ -74,16 +75,13 @@ public class ProjectStatusService {
         if (to == ProjectStatus.APPROVED) {
             project.setApprovedAt(Instant.now());
             project.setApprovedTotal(projectQuoteService.quote(projectId, null, user).grandTotal());
+            QuoteVersion approved = quoteVersionService.createApprovedVersion(project, user);
+            project.setApprovedVersion(approved);
         }
-        if (to == ProjectStatus.QUOTE && from != ProjectStatus.CANCELLED) {
-            // QUOTE'a dönüş (APPROVED→QUOTE): onay bilgilerini temizle
-            project.setApprovedAt(null);
-            project.setApprovedTotal(null);
-        }
-        // CANCELLED→QUOTE: approved fields already null typically; clear anyway
         if (to == ProjectStatus.QUOTE) {
             project.setApprovedAt(null);
             project.setApprovedTotal(null);
+            project.setApprovedVersion(null);
         }
 
         if (req.deliveryDate() != null) {

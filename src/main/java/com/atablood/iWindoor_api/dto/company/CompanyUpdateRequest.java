@@ -27,6 +27,7 @@ public record CompanyUpdateRequest(
         @NotNull @DecimalMin("0") @DecimalMax("500") BigDecimal profitMarginPct,
         @NotNull @DecimalMin("0") BigDecimal laborPerM2,
         @NotNull @DecimalMin("0") BigDecimal installPerM2,
-        @NotNull @DecimalMin("0") @DecimalMax("10") BigDecimal minBillableAreaM2
+        @NotNull @DecimalMin("0") @DecimalMax("10") BigDecimal minBillableAreaM2,
+        @NotNull @DecimalMin("0") @DecimalMax("50") BigDecimal surveyGapMm
 ) {
 }

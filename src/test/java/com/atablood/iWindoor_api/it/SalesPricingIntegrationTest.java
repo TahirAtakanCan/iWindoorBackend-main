@@ -62,7 +62,8 @@ class SalesPricingIntegrationTest {
              "vatRate":20,"defaultDiscountPct":0,"currency":"TRY","quoteNote":null,"quoteValidityDays":15,
              "sawKerfMm":4,"barTrimMm":10,"minOffcutMm":500,
              "glassSupplierName":null,"glassSupplierPhone":null,"glassSupplierEmail":null,"glassOrderNote":null,
-             "pricingMode":"COST_PLUS","profitMarginPct":%s,"laborPerM2":400,"installPerM2":250,"minBillableAreaM2":1.00}""";
+             "pricingMode":"COST_PLUS","profitMarginPct":%s,"laborPerM2":400,"installPerM2":250,"minBillableAreaM2":1.00,
+             "surveyGapMm":10}""";
 
     @Test
     void extrasMarginAndEmployeeCostSummary() throws Exception {

@@ -64,6 +64,13 @@ public class Project {
     @Column(name = "delivery_date")
     private LocalDate deliveryDate;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "approved_version_id")
+    @JsonIgnore
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private QuoteVersion approvedVersion;
+
     @Column(name = "total_price")
     private BigDecimal totalPrice;
 
@@ -109,5 +116,10 @@ public class Project {
     @JsonProperty("customerId")
     public Long getCustomerId() {
         return customer == null ? null : customer.getId();
+    }
+
+    @JsonProperty("approvedVersionId")
+    public Long getApprovedVersionId() {
+        return approvedVersion == null ? null : approvedVersion.getId();
     }
 }

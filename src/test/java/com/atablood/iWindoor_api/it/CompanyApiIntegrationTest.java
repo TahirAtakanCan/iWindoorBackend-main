@@ -57,7 +57,8 @@ class CompanyApiIntegrationTest {
              "currency":"TRY","quoteNote":"Teşekkürler","quoteValidityDays":30,
              "sawKerfMm":4,"barTrimMm":10,"minOffcutMm":500,
              "glassSupplierName":null,"glassSupplierPhone":null,"glassSupplierEmail":null,"glassOrderNote":null,
-             "pricingMode":"COST_PLUS","profitMarginPct":30,"laborPerM2":400,"installPerM2":250,"minBillableAreaM2":1.00}""";
+             "pricingMode":"COST_PLUS","profitMarginPct":30,"laborPerM2":400,"installPerM2":250,"minBillableAreaM2":1.00,
+             "surveyGapMm":10}""";
 
     @Test
     void companyAdminCanUpdateDefaults_employeeForbidden() throws Exception {
@@ -114,7 +115,8 @@ class CompanyApiIntegrationTest {
                  "vatRate":20,"defaultDiscountPct":0,"currency":"TRY","quoteNote":null,"quoteValidityDays":15,
                  "sawKerfMm":25,"barTrimMm":10,"minOffcutMm":500,
                  "glassSupplierName":null,"glassSupplierPhone":null,"glassSupplierEmail":null,"glassOrderNote":null,
-                 "pricingMode":"COST_PLUS","profitMarginPct":30,"laborPerM2":400,"installPerM2":250,"minBillableAreaM2":1.00}""";
+                 "pricingMode":"COST_PLUS","profitMarginPct":30,"laborPerM2":400,"installPerM2":250,"minBillableAreaM2":1.00,
+                 "surveyGapMm":10}""";
         call(put("/api/v1/company"), token, badKerf).andExpect(status().isBadRequest());
 
         String ok = """
@@ -123,7 +125,8 @@ class CompanyApiIntegrationTest {
                  "sawKerfMm":3.5,"barTrimMm":12,"minOffcutMm":800,
                  "glassSupplierName":"Cam A.Ş.","glassSupplierPhone":"0555","glassSupplierEmail":"cam@test.com",
                  "glassOrderNote":"Isıcam çıtası gri",
-                 "pricingMode":"COST_PLUS","profitMarginPct":30,"laborPerM2":400,"installPerM2":250,"minBillableAreaM2":1.00}""";
+                 "pricingMode":"COST_PLUS","profitMarginPct":30,"laborPerM2":400,"installPerM2":250,"minBillableAreaM2":1.00,
+                 "surveyGapMm":12}""";
         call(put("/api/v1/company"), token, ok)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sawKerfMm").value(3.5))

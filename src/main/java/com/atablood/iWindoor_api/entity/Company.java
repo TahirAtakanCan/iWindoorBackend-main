@@ -86,6 +86,10 @@ public class Company {
     @Column(name = "min_billable_area_m2", nullable = false, precision = 6, scale = 2)
     private BigDecimal minBillableAreaM2 = new BigDecimal("1.00");
 
+    /** Keşif boşluğundan her kenar için düşülen montaj payı (mm). */
+    @Column(name = "survey_gap_mm", nullable = false, precision = 5, scale = 1)
+    private BigDecimal surveyGapMm = new BigDecimal("10.0");
+
     // Şirkete bağlı çalışanlar
     @OneToMany(mappedBy = "company", cascade = CascadeType.ALL)
     @JsonManagedReference

@@ -6,8 +6,10 @@ import com.atablood.iWindoor_api.dto.project.ProjectExtraItemDto;
 import com.atablood.iWindoor_api.dto.project.ProjectFileDto;
 import com.atablood.iWindoor_api.dto.project.ProjectFileDto.ExtraPart;
 import com.atablood.iWindoor_api.dto.project.ProjectFileDto.ProjectPart;
+import com.atablood.iWindoor_api.dto.project.ProjectFileDto.SurveyPart;
 import com.atablood.iWindoor_api.dto.project.ProjectFileDto.WindowPart;
 import com.atablood.iWindoor_api.dto.project.ProjectRequest;
+import com.atablood.iWindoor_api.dto.survey.SurveyItemDto;
 import com.atablood.iWindoor_api.dto.window.WindowCreateRequest;
 import com.atablood.iWindoor_api.dto.window.WindowDto;
 import com.atablood.iWindoor_api.entity.Project;
@@ -20,6 +22,7 @@ import com.atablood.iWindoor_api.pricing.BomPricer;
 import com.atablood.iWindoor_api.repository.ProjectExtraItemRepository;
 import com.atablood.iWindoor_api.repository.ProjectRepository;
 import com.atablood.iWindoor_api.repository.SeriesRepository;
+import com.atablood.iWindoor_api.repository.SurveyItemRepository;
 import com.atablood.iWindoor_api.security.AccessGuard;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -45,9 +48,11 @@ public class ProjectFileService {
     private final ProjectRepository projectRepository;
     private final SeriesRepository seriesRepository;
     private final ProjectExtraItemRepository extraItemRepository;
+    private final SurveyItemRepository surveyItemRepository;
     private final ProjectService projectService;
     private final WindowService windowService;
     private final ProjectExtraItemService extraItemService;
+    private final SurveyService surveyService;
     private final CustomerService customerService;
     private final CatalogService catalogService;
     private final CatalogProvisioningService provisioning;
@@ -84,6 +89,11 @@ public class ProjectFileService {
                 .map(e -> new ExtraPart(e.getName(), e.getQuantity(), e.getUnit(), e.getUnitPrice(), e.getSortOrder()))
                 .toList();
 
+        List<SurveyPart> survey = surveyItemRepository.findByProject_IdOrderBySortOrderAscIdAsc(projectId).stream()
+                .map(s -> new SurveyPart(s.getRoom(), s.getProductType(), s.getHoleWidth(), s.getHoleHeight(),
+                        s.getQuantity(), s.getNote(), s.getSortOrder()))
+                .toList();
+
         ProjectFileDto body = new ProjectFileDto(
                 FORMAT,
                 VERSION,
@@ -96,7 +106,8 @@ public class ProjectFileService {
                         project.getCustomerEmail(),
                         project.getCustomerAddress()),
                 windows,
-                extras
+                extras,
+                survey
         );
 
         String filename = asciiSlug(project.getName()) + ".iwd";
@@ -188,6 +199,18 @@ public class ProjectFileService {
                         new ProjectExtraItemDto.Request(e.name(), qty, unit, e.unitPrice(),
                                 e.sortOrder() == null ? 0 : e.sortOrder()),
                         user);
+            }
+        }
+
+        // Keşif kalemleri (fotoğrafsız); sürümler aktarılmaz.
+        if (file.survey() != null) {
+            for (SurveyPart s : file.survey()) {
+                if (s == null || s.room() == null || s.productType() == null
+                        || s.holeWidth() == null || s.holeHeight() == null) continue;
+                surveyService.create(project.getId(), new SurveyItemDto.Request(
+                        s.room(), s.productType(), s.holeWidth(), s.holeHeight(),
+                        s.quantity() == null ? 1 : s.quantity(), s.note(),
+                        s.sortOrder() == null ? 0 : s.sortOrder()), user);
             }
         }
 

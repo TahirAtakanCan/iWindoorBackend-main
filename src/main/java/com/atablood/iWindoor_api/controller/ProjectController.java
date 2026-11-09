@@ -31,6 +31,8 @@ public class ProjectController {
     private final ProjectExtraItemService extraItemService;
     private final ProjectStatusService projectStatusService;
     private final PaymentService paymentService;
+    private final QuoteVersionService quoteVersionService;
+    private final SurveyService surveyService;
 
     @PostMapping
     public Project createProject(@Valid @RequestBody ProjectRequest request, @AuthenticationPrincipal User currentUser) {
@@ -165,5 +167,83 @@ public class ProjectController {
                                               @AuthenticationPrincipal User currentUser) {
         paymentService.delete(id, paymentId, currentUser);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/versions")
+    public List<com.atablood.iWindoor_api.dto.quote.QuoteVersionDto> listVersions(
+            @PathVariable Long id, @AuthenticationPrincipal User currentUser) {
+        return quoteVersionService.list(id, currentUser);
+    }
+
+    @PostMapping("/{id}/versions")
+    public com.atablood.iWindoor_api.dto.quote.QuoteVersionDto createVersion(
+            @PathVariable Long id,
+            @RequestBody(required = false) com.atablood.iWindoor_api.dto.quote.QuoteVersionDto.CreateRequest request,
+            @AuthenticationPrincipal User currentUser) {
+        return quoteVersionService.create(id, request, currentUser);
+    }
+
+    @GetMapping("/{id}/versions/{versionId}")
+    public com.atablood.iWindoor_api.dto.quote.QuoteVersionDto.DetailDto getVersion(
+            @PathVariable Long id, @PathVariable Long versionId, @AuthenticationPrincipal User currentUser) {
+        return quoteVersionService.get(id, versionId, currentUser);
+    }
+
+    @PostMapping("/{id}/versions/{versionId}/restore")
+    public com.atablood.iWindoor_api.dto.quote.QuoteVersionDto.RestoreResponse restoreVersion(
+            @PathVariable Long id, @PathVariable Long versionId, @AuthenticationPrincipal User currentUser) {
+        return quoteVersionService.restore(id, versionId, currentUser);
+    }
+
+    @DeleteMapping("/{id}/versions/{versionId}")
+    public ResponseEntity<Void> deleteVersion(@PathVariable Long id, @PathVariable Long versionId,
+                                              @AuthenticationPrincipal User currentUser) {
+        quoteVersionService.delete(id, versionId, currentUser);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/survey")
+    public List<com.atablood.iWindoor_api.dto.survey.SurveyItemDto> listSurvey(
+            @PathVariable Long id, @AuthenticationPrincipal User currentUser) {
+        return surveyService.list(id, currentUser);
+    }
+
+    @PostMapping("/{id}/survey")
+    public com.atablood.iWindoor_api.dto.survey.SurveyItemDto createSurvey(
+            @PathVariable Long id,
+            @Valid @RequestBody com.atablood.iWindoor_api.dto.survey.SurveyItemDto.Request request,
+            @AuthenticationPrincipal User currentUser) {
+        return surveyService.create(id, request, currentUser);
+    }
+
+    @PutMapping("/{id}/survey/{itemId}")
+    public com.atablood.iWindoor_api.dto.survey.SurveyItemDto updateSurvey(
+            @PathVariable Long id, @PathVariable Long itemId,
+            @Valid @RequestBody com.atablood.iWindoor_api.dto.survey.SurveyItemDto.Request request,
+            @AuthenticationPrincipal User currentUser) {
+        return surveyService.update(id, itemId, request, currentUser);
+    }
+
+    @DeleteMapping("/{id}/survey/{itemId}")
+    public ResponseEntity<Void> deleteSurvey(@PathVariable Long id, @PathVariable Long itemId,
+                                             @AuthenticationPrincipal User currentUser) {
+        surveyService.delete(id, itemId, currentUser);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{id}/survey/{itemId}/link")
+    public com.atablood.iWindoor_api.dto.survey.SurveyItemDto linkSurvey(
+            @PathVariable Long id, @PathVariable Long itemId,
+            @RequestBody com.atablood.iWindoor_api.dto.survey.SurveyItemDto.LinkRequest request,
+            @AuthenticationPrincipal User currentUser) {
+        return surveyService.link(id, itemId, request, currentUser);
+    }
+
+    @PostMapping(value = "/{id}/survey/{itemId}/photos", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public java.util.Map<String, Long> uploadSurveyPhoto(
+            @PathVariable Long id, @PathVariable Long itemId,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            @AuthenticationPrincipal User currentUser) {
+        return surveyService.uploadPhoto(id, itemId, file, currentUser);
     }
 }

@@ -12,7 +12,8 @@ public record ProjectFileDto(
         Instant exportedAt,
         ProjectPart project,
         List<WindowPart> windows,
-        List<ExtraPart> extras
+        List<ExtraPart> extras,
+        List<SurveyPart> survey
 ) {
     public record ProjectPart(
             String name,
@@ -41,6 +42,17 @@ public record ProjectFileDto(
             BigDecimal quantity,
             String unit,
             BigDecimal unitPrice,
+            Integer sortOrder
+    ) {
+    }
+
+    public record SurveyPart(
+            String room,
+            String productType,
+            BigDecimal holeWidth,
+            BigDecimal holeHeight,
+            Integer quantity,
+            String note,
             Integer sortOrder
     ) {
     }
