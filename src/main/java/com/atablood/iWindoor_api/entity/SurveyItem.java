@@ -56,6 +56,10 @@ public class SurveyItem {
     @Column(name = "sort_order", nullable = false)
     private int sortOrder = 0;
 
+    /** Çevrimdışı istemci kimliği; (project_id, client_id) kısmi unique. */
+    @Column(name = "client_id", length = 64)
+    private String clientId;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

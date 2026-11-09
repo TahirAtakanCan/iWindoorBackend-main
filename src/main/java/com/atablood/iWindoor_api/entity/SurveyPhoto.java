@@ -34,6 +34,10 @@ public class SurveyPhoto {
     @Column(name = "size_bytes", nullable = false)
     private int sizeBytes;
 
+    /** Çevrimdışı istemci kimliği; (survey_item_id, client_id) kısmi unique. */
+    @Column(name = "client_id", length = 64)
+    private String clientId;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

@@ -209,11 +209,15 @@ public class ProjectController {
     }
 
     @PostMapping("/{id}/survey")
-    public com.atablood.iWindoor_api.dto.survey.SurveyItemDto createSurvey(
+    public ResponseEntity<com.atablood.iWindoor_api.dto.survey.SurveyItemDto> createSurvey(
             @PathVariable Long id,
             @Valid @RequestBody com.atablood.iWindoor_api.dto.survey.SurveyItemDto.Request request,
             @AuthenticationPrincipal User currentUser) {
-        return surveyService.create(id, request, currentUser);
+        var result = surveyService.create(id, request, currentUser);
+        return ResponseEntity.status(result.created()
+                        ? org.springframework.http.HttpStatus.CREATED
+                        : org.springframework.http.HttpStatus.OK)
+                .body(result.body());
     }
 
     @PutMapping("/{id}/survey/{itemId}")
@@ -240,10 +244,15 @@ public class ProjectController {
     }
 
     @PostMapping(value = "/{id}/survey/{itemId}/photos", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
-    public java.util.Map<String, Long> uploadSurveyPhoto(
+    public ResponseEntity<java.util.Map<String, Long>> uploadSurveyPhoto(
             @PathVariable Long id, @PathVariable Long itemId,
             @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            @RequestParam(value = "clientId", required = false) String clientId,
             @AuthenticationPrincipal User currentUser) {
-        return surveyService.uploadPhoto(id, itemId, file, currentUser);
+        var result = surveyService.uploadPhoto(id, itemId, file, clientId, currentUser);
+        return ResponseEntity.status(result.created()
+                        ? org.springframework.http.HttpStatus.CREATED
+                        : org.springframework.http.HttpStatus.OK)
+                .body(java.util.Map.of("id", result.id()));
     }
 }

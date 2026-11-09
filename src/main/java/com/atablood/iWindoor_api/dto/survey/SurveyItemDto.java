@@ -19,7 +19,8 @@ public record SurveyItemDto(
         List<Long> photoIds,
         BigDecimal suggestedWidth,
         BigDecimal suggestedHeight,
-        Instant createdAt
+        Instant createdAt,
+        String clientId
 ) {
     public record Request(
             @NotBlank @Size(max = 120) String room,
@@ -28,10 +29,18 @@ public record SurveyItemDto(
             @NotNull @DecimalMin("200") @DecimalMax("12000") BigDecimal holeHeight,
             @NotNull @Min(1) @Max(10000) Integer quantity,
             @Size(max = 1000) String note,
-            Integer sortOrder
+            Integer sortOrder,
+            @Size(max = 64) String clientId
     ) {
     }
 
     public record LinkRequest(Long windowUnitId) {
+    }
+
+    /** created=true → 201, false → 200 (idempotent tekrar). */
+    public record CreateResult(SurveyItemDto body, boolean created) {
+    }
+
+    public record PhotoResult(Long id, boolean created) {
     }
 }

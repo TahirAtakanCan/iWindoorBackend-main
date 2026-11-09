@@ -122,7 +122,7 @@ class VersionsAndSurveyIntegrationTest {
         // Keşif
         String surveyId = str(call(post("/api/v1/projects/" + project + "/survey"), token,
                 "{\"room\":\"Salon\",\"productType\":\"WINDOW\",\"holeWidth\":1420,\"holeHeight\":1420,\"quantity\":1}")
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.suggestedWidth").value(1400))
                 .andExpect(jsonPath("$.suggestedHeight").value(1400)), "$.id");
 
@@ -137,7 +137,7 @@ class VersionsAndSurveyIntegrationTest {
         MockMultipartFile photo = new MockMultipartFile("file", "a.png", "image/png", png);
         String photoId = str(mvc.perform(multipart("/api/v1/projects/" + project + "/survey/" + surveyId + "/photos")
                         .file(photo).header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk()), "$.id");
+                .andExpect(status().isCreated()), "$.id");
 
         byte[] downloaded = mvc.perform(get("/api/v1/survey-photos/" + photoId)
                         .header("Authorization", "Bearer " + token))

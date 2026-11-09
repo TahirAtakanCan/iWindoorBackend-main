@@ -210,7 +210,7 @@ public class ProjectFileService {
                 surveyService.create(project.getId(), new SurveyItemDto.Request(
                         s.room(), s.productType(), s.holeWidth(), s.holeHeight(),
                         s.quantity() == null ? 1 : s.quantity(), s.note(),
-                        s.sortOrder() == null ? 0 : s.sortOrder()), user);
+                        s.sortOrder() == null ? 0 : s.sortOrder(), null), user);
             }
         }
 

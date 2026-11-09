@@ -1,7 +1,9 @@
 package com.atablood.iWindoor_api.service;
 
 import com.atablood.iWindoor_api.dto.survey.SurveyItemDto;
+import com.atablood.iWindoor_api.dto.survey.SurveyItemDto.CreateResult;
 import com.atablood.iWindoor_api.dto.survey.SurveyItemDto.LinkRequest;
+import com.atablood.iWindoor_api.dto.survey.SurveyItemDto.PhotoResult;
 import com.atablood.iWindoor_api.dto.survey.SurveyItemDto.Request;
 import com.atablood.iWindoor_api.entity.*;
 import com.atablood.iWindoor_api.exception.BadRequestException;
@@ -24,7 +26,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -53,13 +54,23 @@ public class SurveyService {
     }
 
     @Transactional
-    public SurveyItemDto create(Long projectId, Request req, User user) {
+    public CreateResult create(Long projectId, Request req, User user) {
         Project project = loadProject(projectId, user);
+        String clientId = blankToNull(req.clientId());
+        if (clientId != null) {
+            var existing = surveyItemRepository.findByProject_IdAndClientId(projectId, clientId);
+            if (existing.isPresent()) {
+                SurveyItem item = existing.get();
+                item.getPhotos().size();
+                return new CreateResult(toDto(item, surveyGap(project)), false);
+            }
+        }
         SurveyItem item = new SurveyItem();
         item.setProject(project);
+        item.setClientId(clientId);
         apply(item, req);
         SurveyItem saved = surveyItemRepository.save(item);
-        return toDto(saved, surveyGap(project));
+        return new CreateResult(toDto(saved, surveyGap(project)), true);
     }
 
     @Transactional
@@ -68,15 +79,15 @@ public class SurveyService {
         SurveyItem item = surveyItemRepository.findByIdAndProject_Id(itemId, projectId)
                 .orElseThrow(() -> new NotFoundException("Keşif kalemi", itemId));
         apply(item, req);
+        // clientId güncellenmez (idempotent anahtar)
         return toDto(surveyItemRepository.save(item), surveyGap(project));
     }
 
     @Transactional
     public void delete(Long projectId, Long itemId, User user) {
         loadProject(projectId, user);
-        SurveyItem item = surveyItemRepository.findByIdAndProject_Id(itemId, projectId)
-                .orElseThrow(() -> new NotFoundException("Keşif kalemi", itemId));
-        surveyItemRepository.delete(item);
+        surveyItemRepository.findByIdAndProject_Id(itemId, projectId)
+                .ifPresent(surveyItemRepository::delete);
     }
 
     @Transactional
@@ -98,10 +109,17 @@ public class SurveyService {
     }
 
     @Transactional
-    public Map<String, Long> uploadPhoto(Long projectId, Long itemId, MultipartFile file, User user) {
+    public PhotoResult uploadPhoto(Long projectId, Long itemId, MultipartFile file, String clientIdParam, User user) {
         loadProject(projectId, user);
         SurveyItem item = surveyItemRepository.findByIdAndProject_Id(itemId, projectId)
                 .orElseThrow(() -> new NotFoundException("Keşif kalemi", itemId));
+        String clientId = blankToNull(clientIdParam);
+        if (clientId != null) {
+            var existing = surveyPhotoRepository.findBySurveyItem_IdAndClientId(itemId, clientId);
+            if (existing.isPresent()) {
+                return new PhotoResult(existing.get().getId(), false);
+            }
+        }
         if (file == null || file.isEmpty()) {
             throw new BadRequestException("VALIDATION_FAILED", "Dosya gerekli.");
         }
@@ -121,8 +139,9 @@ public class SurveyService {
             photo.setContentType(ct);
             photo.setData(file.getBytes());
             photo.setSizeBytes((int) file.getSize());
+            photo.setClientId(clientId);
             SurveyPhoto saved = surveyPhotoRepository.save(photo);
-            return Map.of("id", saved.getId());
+            return new PhotoResult(saved.getId(), true);
         } catch (IOException e) {
             throw new BadRequestException("VALIDATION_FAILED", "Dosya okunamadı.");
         }
@@ -157,7 +176,8 @@ public class SurveyService {
         Long windowId = item.getWindowUnit() == null ? null : item.getWindowUnit().getId();
         return new SurveyItemDto(item.getId(), item.getRoom(), item.getProductType(),
                 item.getHoleWidth(), item.getHoleHeight(), item.getQuantity(), item.getNote(),
-                item.getSortOrder(), windowId, photoIds, suggestedW, suggestedH, item.getCreatedAt());
+                item.getSortOrder(), windowId, photoIds, suggestedW, suggestedH, item.getCreatedAt(),
+                item.getClientId());
     }
 
     private static void apply(SurveyItem item, Request req) {
@@ -184,5 +204,9 @@ public class SurveyService {
         return companyRepository.findById(companyId)
                 .map(c -> c.getSurveyGapMm() == null ? new BigDecimal("10.0") : c.getSurveyGapMm())
                 .orElse(new BigDecimal("10.0"));
+    }
+
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
     }
 }

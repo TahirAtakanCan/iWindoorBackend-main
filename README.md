@@ -31,6 +31,9 @@ IWINDOOR_IT=true ./mvnw test                  # + PostgreSQL entegrasyon testler
 Entegrasyon testleri `windoor_test` veritabanını kullanır (`IWINDOOR_TEST_DB_URL` ile değiştirilebilir).
 Windows PowerShell: `$env:IWINDOOR_IT="true"; .\mvnw.cmd test`
 
+Uç nokta ekleyince API rota sözleşmesini güncelleyin: `.\mvnw.cmd test -Dtest=ApiRoutesTest -Dapi.routes.update=true`
+(`docs/api-routes.txt`; `ApiRoutesTest` fark görürse düşer).
+
 ## Katalog
 
 Her şirketin kendi kataloğu ve fiyatları var. Şirket kayıt olurken şablon katalog (`company_id IS NULL`,

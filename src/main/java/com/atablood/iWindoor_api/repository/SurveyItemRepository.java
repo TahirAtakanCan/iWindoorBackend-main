@@ -11,4 +11,6 @@ public interface SurveyItemRepository extends JpaRepository<SurveyItem, Long> {
     List<SurveyItem> findByProject_IdOrderBySortOrderAscIdAsc(Long projectId);
 
     Optional<SurveyItem> findByIdAndProject_Id(Long id, Long projectId);
+
+    Optional<SurveyItem> findByProject_IdAndClientId(Long projectId, String clientId);
 }
