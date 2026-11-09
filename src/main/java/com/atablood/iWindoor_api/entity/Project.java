@@ -1,6 +1,7 @@
 package com.atablood.iWindoor_api.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
@@ -9,6 +10,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -22,7 +25,7 @@ public class Project {
     private Long id;
 
     @Column(nullable = false)
-    private String name; // Örn: "Ahmet Bey - Yayla Evi"
+    private String name;
 
     private String description;
 
@@ -38,11 +41,32 @@ public class Project {
     @Column(name = "customer_address", length = 500)
     private String customerAddress;
 
-    // Proje malzeme toplam tutarı (Hesaplama sonucu güncellenir)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id")
+    @JsonIgnore
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Customer customer;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private ProjectStatus status = ProjectStatus.QUOTE;
+
+    @Column(name = "status_changed_at")
+    private Instant statusChangedAt;
+
+    @Column(name = "approved_at")
+    private Instant approvedAt;
+
+    @Column(name = "approved_total", precision = 14, scale = 2)
+    private BigDecimal approvedTotal;
+
+    @Column(name = "delivery_date")
+    private LocalDate deliveryDate;
+
     @Column(name = "total_price")
     private BigDecimal totalPrice;
 
-    /** İskonto/KDV öncesi satış ara toplamı (önbellek). */
     @Column(name = "sale_total", precision = 14, scale = 2)
     private BigDecimal saleTotal;
 
@@ -56,19 +80,34 @@ public class Project {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
-    // Bir projenin birden fazla penceresi/kapısı olur.
-    // CascadeType.ALL: Projeyi silersem içindeki tüm pencereler de silinsin.
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("id ASC")
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private List<WindowUnit> windowUnits = new java.util.ArrayList<>();
 
-    // Kullanıcı (şifre özeti dahil) JSON'a asla yazılmaz
     @JsonIgnore
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     @ManyToOne
     @JoinColumn(name = "user_id")
     private User createdBy;
+
+    /** Yanıt için doldurulur (kalıcı değil). */
+    @Transient
+    private BigDecimal paidTotal;
+
+    @Transient
+    private BigDecimal balance;
+
+    @Transient
+    private Boolean priceChangedAfterApproval;
+
+    @Transient
+    private BigDecimal priceDelta;
+
+    @JsonProperty("customerId")
+    public Long getCustomerId() {
+        return customer == null ? null : customer.getId();
+    }
 }

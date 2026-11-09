@@ -48,6 +48,7 @@ public class ProjectFileService {
     private final ProjectService projectService;
     private final WindowService windowService;
     private final ProjectExtraItemService extraItemService;
+    private final CustomerService customerService;
     private final CatalogService catalogService;
     private final CatalogProvisioningService provisioning;
     private final PricingService pricingService;
@@ -131,6 +132,12 @@ public class ProjectFileService {
                 ? baseName.substring(0, Math.max(0, 200 - suffix.length())) + suffix
                 : baseName + suffix;
         ProjectPart src = file.project();
+        Long customerId = null;
+        if (src.customerName() != null && !src.customerName().isBlank()) {
+            var customer = customerService.findOrCreate(companyId, src.customerName(), src.customerPhone(),
+                    src.customerEmail(), src.customerAddress());
+            customerId = customer == null ? null : customer.getId();
+        }
         Project project = projectService.createProject(
                 new ProjectRequest(
                         importName,
@@ -138,8 +145,10 @@ public class ProjectFileService {
                         src.customerName(),
                         src.customerPhone(),
                         src.customerEmail(),
-                        src.customerAddress()),
+                        src.customerAddress(),
+                        customerId),
                 user);
+        // İçe aktarma: durum QUOTE (varsayılan); ödeme ve geçmiş aktarılmaz.
 
         Series defaultSeries = catalogService.defaultSeries(companyId);
 

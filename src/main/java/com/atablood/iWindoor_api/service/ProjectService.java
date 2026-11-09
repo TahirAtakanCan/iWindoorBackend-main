@@ -4,6 +4,7 @@ import com.atablood.iWindoor_api.dto.ProjectCostSummaryDTO;
 import com.atablood.iWindoor_api.dto.ProjectSpecsDTO;
 import com.atablood.iWindoor_api.dto.project.ProjectRequest;
 import com.atablood.iWindoor_api.entity.Project;
+import com.atablood.iWindoor_api.entity.ProjectStatus;
 import com.atablood.iWindoor_api.entity.User;
 
 import java.util.List;
@@ -13,7 +14,7 @@ public interface ProjectService {
 
     Project updateProject(Long id, ProjectRequest request, User currentUser);
 
-    List<Project> getAllProjects(User currentUser);
+    List<Project> getAllProjects(User currentUser, ProjectStatus status, Long customerId);
 
     Project getProject(Long id, User currentUser);
 

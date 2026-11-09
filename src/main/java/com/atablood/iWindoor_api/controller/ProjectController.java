@@ -2,19 +2,14 @@ package com.atablood.iWindoor_api.controller;
 
 import com.atablood.iWindoor_api.dto.ProjectCostSummaryDTO;
 import com.atablood.iWindoor_api.dto.ProjectSpecsDTO;
-import com.atablood.iWindoor_api.dto.project.ProjectExtraItemDto;
-import com.atablood.iWindoor_api.dto.project.ProjectFileDto;
-import com.atablood.iWindoor_api.dto.project.ProjectRequest;
+import com.atablood.iWindoor_api.dto.project.*;
 import com.atablood.iWindoor_api.dto.quote.ProjectQuoteDto;
 import com.atablood.iWindoor_api.dto.window.WindowCreateRequest;
 import com.atablood.iWindoor_api.dto.window.WindowDto;
 import com.atablood.iWindoor_api.entity.Project;
+import com.atablood.iWindoor_api.entity.ProjectStatus;
 import com.atablood.iWindoor_api.entity.User;
-import com.atablood.iWindoor_api.service.ProjectExtraItemService;
-import com.atablood.iWindoor_api.service.ProjectFileService;
-import com.atablood.iWindoor_api.service.ProjectQuoteService;
-import com.atablood.iWindoor_api.service.ProjectService;
-import com.atablood.iWindoor_api.service.WindowService;
+import com.atablood.iWindoor_api.service.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +29,8 @@ public class ProjectController {
     private final ProjectQuoteService projectQuoteService;
     private final ProjectFileService projectFileService;
     private final ProjectExtraItemService extraItemService;
+    private final ProjectStatusService projectStatusService;
+    private final PaymentService paymentService;
 
     @PostMapping
     public Project createProject(@Valid @RequestBody ProjectRequest request, @AuthenticationPrincipal User currentUser) {
@@ -46,8 +43,10 @@ public class ProjectController {
     }
 
     @GetMapping
-    public List<Project> getAllProjects(@AuthenticationPrincipal User currentUser) {
-        return projectService.getAllProjects(currentUser);
+    public List<Project> getAllProjects(@RequestParam(required = false) ProjectStatus status,
+                                        @RequestParam(required = false) Long customerId,
+                                        @AuthenticationPrincipal User currentUser) {
+        return projectService.getAllProjects(currentUser, status, customerId);
     }
 
     @GetMapping("/{id}")
@@ -80,7 +79,6 @@ public class ProjectController {
         return ResponseEntity.ok().build();
     }
 
-    /** Pencere ekle. Eski uygulama {name,width,height}; yeni istemci ek olarak seriesId ve design gönderebilir. */
     @PostMapping("/{id}/windows")
     public WindowDto addWindow(@PathVariable Long id, @Valid @RequestBody WindowCreateRequest request,
                                @AuthenticationPrincipal User currentUser) {
@@ -131,6 +129,41 @@ public class ProjectController {
     public ResponseEntity<Void> deleteExtra(@PathVariable Long id, @PathVariable Long itemId,
                                             @AuthenticationPrincipal User currentUser) {
         extraItemService.delete(id, itemId, currentUser);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/status")
+    public Project changeStatus(@PathVariable Long id, @Valid @RequestBody StatusChangeRequest request,
+                                @AuthenticationPrincipal User currentUser) {
+        return projectStatusService.changeStatus(id, request, currentUser);
+    }
+
+    @GetMapping("/{id}/history")
+    public List<StatusHistoryDto> history(@PathVariable Long id, @AuthenticationPrincipal User currentUser) {
+        return projectStatusService.history(id, currentUser);
+    }
+
+    @PutMapping("/{id}/delivery-date")
+    public Project setDeliveryDate(@PathVariable Long id, @RequestBody DeliveryDateRequest request,
+                                   @AuthenticationPrincipal User currentUser) {
+        return projectStatusService.setDeliveryDate(id, request == null ? null : request.deliveryDate(), currentUser);
+    }
+
+    @GetMapping("/{id}/payments")
+    public PaymentDto.ListResponse listPayments(@PathVariable Long id, @AuthenticationPrincipal User currentUser) {
+        return paymentService.list(id, currentUser);
+    }
+
+    @PostMapping("/{id}/payments")
+    public PaymentDto createPayment(@PathVariable Long id, @Valid @RequestBody PaymentRequest request,
+                                    @AuthenticationPrincipal User currentUser) {
+        return paymentService.create(id, request, currentUser);
+    }
+
+    @DeleteMapping("/{id}/payments/{paymentId}")
+    public ResponseEntity<Void> deletePayment(@PathVariable Long id, @PathVariable Long paymentId,
+                                              @AuthenticationPrincipal User currentUser) {
+        paymentService.delete(id, paymentId, currentUser);
         return ResponseEntity.noContent().build();
     }
 }

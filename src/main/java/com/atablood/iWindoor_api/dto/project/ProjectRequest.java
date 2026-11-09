@@ -10,6 +10,7 @@ public record ProjectRequest(
         @Size(max = 200) String customerName,
         @Size(max = 50) String customerPhone,
         @Email @Size(max = 200) String customerEmail,
-        @Size(max = 500) String customerAddress
+        @Size(max = 500) String customerAddress,
+        Long customerId
 ) {
 }

@@ -3,14 +3,13 @@ package com.atablood.iWindoor_api.service.impl;
 import com.atablood.iWindoor_api.dto.ProjectCostSummaryDTO;
 import com.atablood.iWindoor_api.dto.ProjectSpecsDTO;
 import com.atablood.iWindoor_api.dto.project.ProjectRequest;
-import com.atablood.iWindoor_api.entity.Project;
-import com.atablood.iWindoor_api.entity.User;
-import com.atablood.iWindoor_api.entity.WindowNode;
-import com.atablood.iWindoor_api.entity.WindowUnit;
+import com.atablood.iWindoor_api.entity.*;
 import com.atablood.iWindoor_api.exception.NotFoundException;
 import com.atablood.iWindoor_api.repository.ProjectRepository;
 import com.atablood.iWindoor_api.security.AccessGuard;
+import com.atablood.iWindoor_api.service.CustomerService;
 import com.atablood.iWindoor_api.service.PricingService;
+import com.atablood.iWindoor_api.service.ProjectFinanceService;
 import com.atablood.iWindoor_api.service.ProjectService;
 import com.atablood.iWindoor_api.service.SalesPricingService;
 import lombok.RequiredArgsConstructor;
@@ -26,41 +25,76 @@ public class ProjectServiceImpl implements ProjectService {
     private final ProjectRepository projectRepository;
     private final PricingService pricingService;
     private final SalesPricingService salesPricingService;
+    private final ProjectFinanceService financeService;
+    private final CustomerService customerService;
     private final AccessGuard guard;
 
     @Override
     @Transactional
     public Project createProject(ProjectRequest request, User currentUser) {
-        guard.companyId(currentUser);
+        Long companyId = guard.companyId(currentUser);
         Project project = new Project();
-        applyRequest(project, request);
+        applyRequest(project, request, companyId);
         project.setCreatedBy(currentUser);
-        return projectRepository.save(project);
+        project.setStatus(ProjectStatus.QUOTE);
+        Project saved = projectRepository.save(project);
+        financeService.enrich(saved, currentUser);
+        return saved;
     }
 
     @Override
     @Transactional
     public Project updateProject(Long id, ProjectRequest request, User currentUser) {
         Project project = getProject(id, currentUser);
-        applyRequest(project, request);
-        return projectRepository.save(project);
+        applyRequest(project, request, guard.companyId(currentUser));
+        Project saved = projectRepository.save(project);
+        financeService.enrich(saved, currentUser);
+        return saved;
     }
 
-    private static void applyRequest(Project project, ProjectRequest request) {
+    private void applyRequest(Project project, ProjectRequest request, Long companyId) {
         project.setName(request.name());
         project.setDescription(request.description());
-        project.setCustomerName(request.customerName());
-        project.setCustomerPhone(request.customerPhone());
-        project.setCustomerEmail(request.customerEmail());
-        project.setCustomerAddress(request.customerAddress());
+        if (request.customerId() != null) {
+            Customer customer = customerService.requireForCompany(request.customerId(), companyId);
+            project.setCustomer(customer);
+            project.setCustomerName(customer.getName());
+            project.setCustomerPhone(customer.getPhone());
+            project.setCustomerEmail(customer.getEmail());
+            project.setCustomerAddress(customer.getAddress());
+        } else if (request.customerName() != null && !request.customerName().isBlank()) {
+            project.setCustomerName(request.customerName());
+            project.setCustomerPhone(request.customerPhone());
+            project.setCustomerEmail(request.customerEmail());
+            project.setCustomerAddress(request.customerAddress());
+            Customer customer = customerService.findOrCreate(companyId, request.customerName(),
+                    request.customerPhone(), request.customerEmail(), request.customerAddress());
+            project.setCustomer(customer);
+        } else {
+            project.setCustomerName(request.customerName());
+            project.setCustomerPhone(request.customerPhone());
+            project.setCustomerEmail(request.customerEmail());
+            project.setCustomerAddress(request.customerAddress());
+        }
     }
 
     @Override
     @Transactional
-    public List<Project> getAllProjects(User currentUser) {
-        List<Project> projects = projectRepository.findAllByCreatedBy_Company_Id(guard.companyId(currentUser));
+    public List<Project> getAllProjects(User currentUser, ProjectStatus status, Long customerId) {
+        Long companyId = guard.companyId(currentUser);
+        List<Project> projects;
+        if (status != null && customerId != null) {
+            projects = projectRepository.findAllByCreatedBy_Company_IdAndStatusAndCustomer_Id(companyId, status, customerId);
+        } else if (status != null) {
+            projects = projectRepository.findAllByCreatedBy_Company_IdAndStatus(companyId, status);
+        } else if (customerId != null) {
+            projects = projectRepository.findAllByCreatedBy_Company_IdAndCustomer_Id(companyId, customerId);
+        } else {
+            projects = projectRepository.findAllByCreatedBy_Company_Id(companyId);
+        }
         for (Project p : projects) {
             if (p.getSaleTotal() == null) salesPricingService.ensureSaleTotal(p);
+            financeService.enrich(p, currentUser);
         }
         return projects;
     }
@@ -71,7 +105,9 @@ public class ProjectServiceImpl implements ProjectService {
         Project project = projectRepository.findById(id).orElseThrow(() -> new NotFoundException("Proje", id));
         guard.checkProject(project, currentUser);
         if (project.getSaleTotal() == null) salesPricingService.ensureSaleTotal(project);
-        return projectRepository.findById(id).orElse(project);
+        project = projectRepository.findById(id).orElse(project);
+        financeService.enrich(project, currentUser);
+        return project;
     }
 
     @Override
