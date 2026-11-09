@@ -2,6 +2,7 @@ package com.atablood.iWindoor_api.config;
 
 import com.atablood.iWindoor_api.entity.*;
 import com.atablood.iWindoor_api.repository.AccessoryRepository;
+import com.atablood.iWindoor_api.repository.ColorRepository;
 import com.atablood.iWindoor_api.repository.GlassRepository;
 import com.atablood.iWindoor_api.repository.HardwareRuleRepository;
 import com.atablood.iWindoor_api.repository.ProfileRepository;
@@ -30,6 +31,7 @@ public class DataSeeder implements CommandLineRunner {
     private final GlassRepository glassRepository;
     private final AccessoryRepository accessoryRepository;
     private final HardwareRuleRepository hardwareRuleRepository;
+    private final ColorRepository colorRepository;
 
     @Override
     @Transactional
@@ -51,6 +53,19 @@ public class DataSeeder implements CommandLineRunner {
             profile(s, "CT70-32", "Çıta (32 mm cam)", ProfileType.BEAD, 20, 38, 30.0, 34.0, false);
             profile(s, "CT70-4", "Çıta (tek cam)", ProfileType.BEAD, 20, 30, 3.0, 8.0, false);
             profile(s, "AD70", "Çift Kanat Adaptörü 70", ProfileType.ADAPTER, 40, 120, null, null, true);
+            profile(s, "KN70-KAPI", "Kapı Kanadı 70", ProfileType.DOOR_SASH, 110, 260, null, null, true);
+            profile(s, "ESIK-AL70", "Alüminyum Eşik 70", ProfileType.THRESHOLD, 20, 310, null, null, true);
+            profile(s, "BRL70", "Birleştirme Profili 70", ProfileType.COUPLING, 20, 140, null, null, true);
+        } else {
+            seriesRepository.findByCompanyIdIsNullOrderByIdAsc().stream()
+                    .filter(s -> TEMPLATE_SERIES.equals(s.getName()))
+                    .findFirst()
+                    .ifPresent(s -> {
+                        ensureProfile(s, "KN70-KAPI", "Kapı Kanadı 70", ProfileType.DOOR_SASH, 110, 260, true);
+                        ensureProfile(s, "ESIK-AL70", "Alüminyum Eşik 70", ProfileType.THRESHOLD, 20, 310, true);
+                        ensureProfile(s, "AD70", "Çift Kanat Adaptörü 70", ProfileType.ADAPTER, 40, 120, true);
+                        ensureProfile(s, "BRL70", "Birleştirme Profili 70", ProfileType.COUPLING, 20, 140, true);
+                    });
         }
         glass("4+16+4", "Şeffaf Isıcam 4+16+4", 24, "clear", 650);
         glass("4+16+4 LE", "Low-E Isıcam 4+16+4", 24, "lowe", 950);
@@ -70,8 +85,31 @@ public class DataSeeder implements CommandLineRunner {
         accessory("CIFT-ACILIM-SET", "Çift açılım takımı", AccessoryUnit.SET, 650);
         accessory("SURME-SET", "Sürme makara takımı", AccessoryUnit.SET, 380);
         accessory("SURME-KOL", "Sürme kolu", AccessoryUnit.PIECE, 220);
+        accessory("PASIF-KANAT-SET", "Pasif kanat takımı", AccessoryUnit.SET, 320);
+        accessory("KAPI-KILIT-SET", "Kapı kilit takımı", AccessoryUnit.SET, 950);
+        accessory("KAPI-KOLU", "Kapı kolu", AccessoryUnit.PIECE, 380);
+        accessory("KAPI-MENTESE", "Kapı menteşesi", AccessoryUnit.PIECE, 140);
+
+        color("white", "Beyaz", "#F4F5F2", "#F4F5F2", 0, 10);
+        color("CREAM", "Krem", "#EFE6D2", "#EFE6D2", 10, 20);
+        color("ANT-1", "Antrasit (tek yüz)", "#3B3F45", "#F4F5F2", 25, 30);
+        color("ANT-2", "Antrasit (çift yüz)", "#3B3F45", "#3B3F45", 40, 40);
+        color("OAK-1", "Altın Meşe (tek yüz)", "#A8692F", "#F4F5F2", 30, 50);
+        color("WAL-1", "Ceviz (tek yüz)", "#5C3A21", "#F4F5F2", 30, 60);
 
         seedHardwareRules();
+    }
+
+    private void color(String code, String name, String hexOut, String hexIn, double pct, int sort) {
+        if (colorRepository.existsByCompanyIdIsNullAndCode(code)) return;
+        Color c = new Color();
+        c.setCode(code);
+        c.setName(name);
+        c.setHexOutside(hexOut);
+        c.setHexInside(hexIn);
+        c.setSurchargePct(BigDecimal.valueOf(pct));
+        c.setSortOrder(sort);
+        colorRepository.save(c);
     }
 
     private void seedHardwareRules() {
@@ -90,6 +128,28 @@ public class DataSeeder implements CommandLineRunner {
         rule("SLIDE", "SURME-KOL", "PER_SASH", 1, 10);
         rule("SLIDE", "SURME-SET", "PER_SASH", 1, 20);
         rule("SLIDE", "CONTA-EPDM", "PER_PERIMETER_METER", 1, 30);
+
+        rule("PASSIVE", "PASIF-KANAT-SET", "PER_SASH", 1, 10);
+        rule("PASSIVE", "MENTESE-SET", "PER_SASH", 1, 20);
+        rule("PASSIVE", "CONTA-EPDM", "PER_PERIMETER_METER", 1, 30);
+
+        rule("DOOR", "KAPI-KILIT-SET", "PER_SASH", 1, 10);
+        rule("DOOR", "KAPI-KOLU", "PER_SASH", 1, 20);
+        rule("DOOR", "KAPI-MENTESE", "PER_SASH", 3, 30);
+        rule("DOOR", "CONTA-EPDM", "PER_PERIMETER_METER", 1, 40);
+
+        rule("DOOR_PASSIVE", "PASIF-KANAT-SET", "PER_SASH", 1, 10);
+        rule("DOOR_PASSIVE", "KAPI-MENTESE", "PER_SASH", 3, 20);
+        rule("DOOR_PASSIVE", "CONTA-EPDM", "PER_PERIMETER_METER", 1, 30);
+    }
+
+    private void ensureProfile(Series s, String code, String name, ProfileType type, double face, double price,
+                               boolean isDefault) {
+        if (profileRepository.existsBySeries_IdAndType(s.getId(), type)
+                || profileRepository.existsByCompanyIdIsNullAndCode(code)) {
+            return;
+        }
+        profile(s, code, name, type, face, price, null, null, isDefault);
     }
 
     private void rule(String kind, String accessoryCode, String qtyType, double qty, int sortOrder) {

@@ -48,6 +48,13 @@ public interface CatalogService {
 
     AccessoryDto updateAccessory(Long id, AccessoryRequest request, User user);
 
+    // --- Renk ---
+    List<ColorDto> getColors(User user, boolean includeInactive);
+
+    ColorDto createColor(ColorRequest request, User user);
+
+    ColorDto updateColor(Long id, ColorRequest request, User user);
+
     // --- Donanım kuralları ---
     List<HardwareRuleDto> getHardwareRules(User user);
 

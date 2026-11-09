@@ -107,6 +107,7 @@ public class PricingServiceImpl implements PricingService {
             case "GLASS" -> "Cam";
             case "PANEL" -> "Panel";
             case "ACCESSORY" -> "Aksesuar";
+            case "COLOR" -> "Renk farkı";
             default -> "Diğer";
         };
     }

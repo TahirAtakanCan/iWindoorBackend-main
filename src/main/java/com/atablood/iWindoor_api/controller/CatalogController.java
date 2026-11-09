@@ -140,6 +140,26 @@ public class CatalogController {
         return catalogService.updateAccessory(id, request, user);
     }
 
+    // --- RENK ---
+    @GetMapping("/colors")
+    public List<ColorDto> getColors(@RequestParam(defaultValue = "false") boolean includeInactive,
+                                    @AuthenticationPrincipal User user) {
+        return catalogService.getColors(user, includeInactive);
+    }
+
+    @PostMapping("/colors")
+    @PreAuthorize("hasAnyAuthority('COMPANY_ADMIN','ADMIN')")
+    public ColorDto createColor(@Valid @RequestBody ColorRequest request, @AuthenticationPrincipal User user) {
+        return catalogService.createColor(request, user);
+    }
+
+    @PutMapping("/colors/{id}")
+    @PreAuthorize("hasAnyAuthority('COMPANY_ADMIN','ADMIN')")
+    public ColorDto updateColor(@PathVariable Long id, @Valid @RequestBody ColorRequest request,
+                                @AuthenticationPrincipal User user) {
+        return catalogService.updateColor(id, request, user);
+    }
+
     // --- DONANIM KURALLARI ---
     @GetMapping("/hardware-rules")
     public List<HardwareRuleDto> hardwareRules(@AuthenticationPrincipal User user) {

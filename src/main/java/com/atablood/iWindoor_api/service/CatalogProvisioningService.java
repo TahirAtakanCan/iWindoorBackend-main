@@ -26,6 +26,7 @@ public class CatalogProvisioningService {
     private final GlassRepository glassRepository;
     private final AccessoryRepository accessoryRepository;
     private final HardwareRuleRepository hardwareRuleRepository;
+    private final ColorRepository colorRepository;
 
     @Transactional
     public void ensureCompanyCatalog(Long companyId) {
@@ -59,6 +60,16 @@ public class CatalogProvisioningService {
                 s.setMaxSashHeightMm(t.getMaxSashHeightMm());
                 s.setMaxSlideSashWidthMm(t.getMaxSlideSashWidthMm());
                 s.setMaxFixedGlassAreaM2(t.getMaxFixedGlassAreaM2());
+                s.setAdapterFaceMm(t.getAdapterFaceMm());
+                s.setDoorSashFaceMm(t.getDoorSashFaceMm());
+                s.setThresholdFaceMm(t.getThresholdFaceMm());
+                s.setThresholdEndAllowanceMm(t.getThresholdEndAllowanceMm());
+                s.setMinDoorSashWidthMm(t.getMinDoorSashWidthMm());
+                s.setMaxDoorSashWidthMm(t.getMaxDoorSashWidthMm());
+                s.setMinDoorSashHeightMm(t.getMinDoorSashHeightMm());
+                s.setMaxDoorSashHeightMm(t.getMaxDoorSashHeightMm());
+                s.setCouplingFaceMm(t.getCouplingFaceMm());
+                s.setCouplingGapMm(t.getCouplingGapMm());
                 s.setCompanyId(companyId);
                 copies.put(t.getId(), seriesRepository.save(s));
             }
@@ -97,6 +108,9 @@ public class CatalogProvisioningService {
             for (Accessory t : accessoryRepository.findByCompanyIdIsNullOrderByIdAsc()) {
                 copyAccessory(t, companyId);
             }
+            for (Color t : colorRepository.findByCompanyIdIsNullOrderBySortOrderAscIdAsc()) {
+                copyColor(t, companyId);
+            }
             for (HardwareRule t : hardwareRuleRepository.findByCompanyIdIsNullOrderBySortOrderAscIdAsc()) {
                 Long mappedSeriesId = t.getSeriesId() == null ? null
                         : (copies.containsKey(t.getSeriesId()) ? copies.get(t.getSeriesId()).getId() : null);
@@ -121,6 +135,11 @@ public class CatalogProvisioningService {
                 copyAccessory(t, companyId);
             }
         }
+        for (Color t : colorRepository.findByCompanyIdIsNullOrderBySortOrderAscIdAsc()) {
+            if (!colorRepository.existsByCompanyIdAndCode(companyId, t.getCode())) {
+                copyColor(t, companyId);
+            }
+        }
     }
 
     private void copyAccessory(Accessory t, Long companyId) {
@@ -132,6 +151,19 @@ public class CatalogProvisioningService {
         a.setCurrency(t.getCurrency());
         a.setCompanyId(companyId);
         accessoryRepository.save(a);
+    }
+
+    private void copyColor(Color t, Long companyId) {
+        Color c = new Color();
+        c.setCompanyId(companyId);
+        c.setCode(t.getCode());
+        c.setName(t.getName());
+        c.setHexOutside(t.getHexOutside());
+        c.setHexInside(t.getHexInside());
+        c.setSurchargePct(t.getSurchargePct());
+        c.setActive(t.isActive());
+        c.setSortOrder(t.getSortOrder());
+        colorRepository.save(c);
     }
 
     private void copyRule(HardwareRule t, Long companyId, Long seriesId) {

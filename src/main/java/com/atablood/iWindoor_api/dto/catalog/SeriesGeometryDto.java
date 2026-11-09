@@ -22,7 +22,17 @@ public record SeriesGeometryDto(
         double maxSashWidth,
         double maxSashHeight,
         double maxSlideSashWidth,
-        double maxFixedGlassArea
+        double maxFixedGlassArea,
+        double adapterFace,
+        double doorSashFace,
+        double thresholdFace,
+        double thresholdEndAllowance,
+        double minDoorSashWidth,
+        double maxDoorSashWidth,
+        double minDoorSashHeight,
+        double maxDoorSashHeight,
+        double couplingFace,
+        double couplingGap
 ) {
     public static SeriesGeometryDto of(Series s) {
         return new SeriesGeometryDto(String.valueOf(s.getId()), s.getFrameFaceMm(), s.getSashFaceMm(), s.getMullionFaceMm(),
@@ -30,6 +40,10 @@ public record SeriesGeometryDto(
                 s.getGlassRebateMullionMm(), s.getWeldAllowanceMm(), s.getMullionEndAllowanceMm(),
                 s.getSlideInterlockMm(), s.getDuplexWidthMm(),
                 s.getMinSashWidthMm(), s.getMinSashHeightMm(), s.getMaxSashWidthMm(), s.getMaxSashHeightMm(),
-                s.getMaxSlideSashWidthMm(), s.getMaxFixedGlassAreaM2());
+                s.getMaxSlideSashWidthMm(), s.getMaxFixedGlassAreaM2(),
+                s.getAdapterFaceMm(), s.getDoorSashFaceMm(), s.getThresholdFaceMm(), s.getThresholdEndAllowanceMm(),
+                s.getMinDoorSashWidthMm(), s.getMaxDoorSashWidthMm(),
+                s.getMinDoorSashHeightMm(), s.getMaxDoorSashHeightMm(),
+                s.getCouplingFaceMm(), s.getCouplingGapMm());
     }
 }

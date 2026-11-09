@@ -6,6 +6,7 @@ import com.atablood.iWindoor_api.exception.BadRequestException;
 import com.atablood.iWindoor_api.exception.ConflictException;
 import com.atablood.iWindoor_api.exception.NotFoundException;
 import com.atablood.iWindoor_api.repository.AccessoryRepository;
+import com.atablood.iWindoor_api.repository.ColorRepository;
 import com.atablood.iWindoor_api.repository.GlassRepository;
 import com.atablood.iWindoor_api.repository.HardwareRuleRepository;
 import com.atablood.iWindoor_api.repository.ProfileRepository;
@@ -29,7 +30,8 @@ import java.util.function.Consumer;
 @RequiredArgsConstructor
 public class CatalogServiceImpl implements CatalogService {
 
-    private static final Set<String> HARDWARE_KINDS = Set.of("TURN", "TILT", "TILT_TURN", "SLIDE");
+    private static final Set<String> HARDWARE_KINDS = Set.of(
+            "TURN", "TILT", "TILT_TURN", "SLIDE", "PASSIVE", "DOOR", "DOOR_PASSIVE");
     private static final Set<String> QTY_TYPES = Set.of("PER_SASH", "PER_PERIMETER_METER");
     private static final Set<String> ADJUST_TARGETS = Set.of("PROFILE", "GLASS", "ACCESSORY", "ALL");
 
@@ -38,6 +40,7 @@ public class CatalogServiceImpl implements CatalogService {
     private final GlassRepository glassRepository;
     private final AccessoryRepository accessoryRepository;
     private final HardwareRuleRepository hardwareRuleRepository;
+    private final ColorRepository colorRepository;
     private final CatalogProvisioningService provisioning;
     private final AccessGuard guard;
 
@@ -56,7 +59,8 @@ public class CatalogServiceImpl implements CatalogService {
                 seriesRepository.findByCompanyIdOrderByIdAsc(c).stream().map(SeriesDto::of).toList(),
                 profileRepository.findByCompanyIdOrderByIdAsc(c).stream().map(ProfileDto::of).toList(),
                 glassRepository.findByCompanyIdOrderByIdAsc(c).stream().map(GlassDto::of).toList(),
-                accessoryRepository.findByCompanyIdOrderByIdAsc(c).stream().map(AccessoryDto::of).toList());
+                accessoryRepository.findByCompanyIdOrderByIdAsc(c).stream().map(AccessoryDto::of).toList(),
+                colorRepository.findByCompanyIdOrderBySortOrderAscIdAsc(c).stream().map(ColorDto::of).toList());
     }
 
     // --- SERİ ---
@@ -109,6 +113,16 @@ public class CatalogServiceImpl implements CatalogService {
         set(g.maxSashHeight(), s::setMaxSashHeightMm);
         set(g.maxSlideSashWidth(), s::setMaxSlideSashWidthMm);
         set(g.maxFixedGlassArea(), s::setMaxFixedGlassAreaM2);
+        set(g.adapterFace(), s::setAdapterFaceMm);
+        set(g.doorSashFace(), s::setDoorSashFaceMm);
+        set(g.thresholdFace(), s::setThresholdFaceMm);
+        set(g.thresholdEndAllowance(), s::setThresholdEndAllowanceMm);
+        set(g.minDoorSashWidth(), s::setMinDoorSashWidthMm);
+        set(g.maxDoorSashWidth(), s::setMaxDoorSashWidthMm);
+        set(g.minDoorSashHeight(), s::setMinDoorSashHeightMm);
+        set(g.maxDoorSashHeight(), s::setMaxDoorSashHeightMm);
+        set(g.couplingFace(), s::setCouplingFaceMm);
+        set(g.couplingGap(), s::setCouplingGapMm);
     }
 
     private static void set(Double v, Consumer<Double> setter) {
@@ -329,6 +343,55 @@ public class CatalogServiceImpl implements CatalogService {
         a.setPrice(r.price());
         if (r.isActive() != null) a.setActive(r.isActive());
         return AccessoryDto.of(accessoryRepository.save(a));
+    }
+
+    // --- RENK ---
+    @Override
+    @Transactional
+    public List<ColorDto> getColors(User user, boolean includeInactive) {
+        Long c = company(user);
+        List<Color> list = includeInactive
+                ? colorRepository.findByCompanyIdOrderBySortOrderAscIdAsc(c)
+                : colorRepository.findByCompanyIdAndActiveTrueOrderBySortOrderAscIdAsc(c);
+        return list.stream().map(ColorDto::of).toList();
+    }
+
+    @Override
+    @Transactional
+    public ColorDto createColor(ColorRequest r, User user) {
+        Long c = company(user);
+        guard.checkCatalogWrite(c, user);
+        if (colorRepository.existsByCompanyIdAndCode(c, r.code())) {
+            throw new ConflictException("CODE_TAKEN", "Bu renk kodu zaten var: " + r.code());
+        }
+        Color color = new Color();
+        color.setCompanyId(c);
+        applyColor(color, r);
+        return ColorDto.of(colorRepository.save(color));
+    }
+
+    @Override
+    @Transactional
+    public ColorDto updateColor(Long id, ColorRequest r, User user) {
+        Color color = colorRepository.findById(id).orElseThrow(() -> new NotFoundException("Renk", id));
+        guard.checkCatalogWrite(color.getCompanyId(), user);
+        String newCode = r.code().trim();
+        if (!newCode.equalsIgnoreCase(color.getCode())
+                && colorRepository.existsByCompanyIdAndCode(color.getCompanyId(), newCode)) {
+            throw new ConflictException("CODE_TAKEN", "Bu renk kodu zaten var: " + newCode);
+        }
+        applyColor(color, r);
+        return ColorDto.of(colorRepository.save(color));
+    }
+
+    private static void applyColor(Color color, ColorRequest r) {
+        color.setCode(r.code().trim());
+        color.setName(r.name());
+        color.setHexOutside(r.hexOutside());
+        color.setHexInside(r.hexInside());
+        color.setSurchargePct(r.surchargePct());
+        if (r.isActive() != null) color.setActive(r.isActive());
+        if (r.sortOrder() != null) color.setSortOrder(r.sortOrder());
     }
 
     // --- DONANIM ---

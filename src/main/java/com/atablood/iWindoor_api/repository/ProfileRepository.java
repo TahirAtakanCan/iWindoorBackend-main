@@ -29,4 +29,8 @@ public interface ProfileRepository extends JpaRepository<Profile, Long> {
     List<Profile> findBySeries_IdAndTypeAndCompanyId(Long seriesId, ProfileType type, Long companyId);
 
     boolean existsByCompanyIdAndCode(Long companyId, String code);
+
+    boolean existsByCompanyIdIsNullAndCode(String code);
+
+    boolean existsBySeries_IdAndType(Long seriesId, ProfileType type);
 }

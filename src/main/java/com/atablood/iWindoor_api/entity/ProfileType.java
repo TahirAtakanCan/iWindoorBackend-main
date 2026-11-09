@@ -6,5 +6,8 @@ public enum ProfileType {
     MULLION,    //Orta Kayıt
     BEAD,       //Cam Çıtası
     ADAPTER,    //Adaptör (Çift Kanat arası vb.)
-    EXTENSION   //Pervaz
+    EXTENSION,  //Pervaz
+    DOOR_SASH,  //Kapı kanadı
+    THRESHOLD,  //Eşik
+    COUPLING    //Birleştirme profili
 }

@@ -23,6 +23,16 @@ public record SeriesGeometryRequest(
         @Positive @DecimalMax("10000") Double maxSashWidth,
         @Positive @DecimalMax("10000") Double maxSashHeight,
         @Positive @DecimalMax("10000") Double maxSlideSashWidth,
-        @Positive @DecimalMax("100") Double maxFixedGlassArea
+        @Positive @DecimalMax("100") Double maxFixedGlassArea,
+        @PositiveOrZero @DecimalMax("300") Double adapterFace,
+        @PositiveOrZero @DecimalMax("300") Double doorSashFace,
+        @PositiveOrZero @DecimalMax("300") Double thresholdFace,
+        @PositiveOrZero @DecimalMax("50") Double thresholdEndAllowance,
+        @Positive @DecimalMax("5000") Double minDoorSashWidth,
+        @Positive @DecimalMax("10000") Double maxDoorSashWidth,
+        @Positive @DecimalMax("5000") Double minDoorSashHeight,
+        @Positive @DecimalMax("10000") Double maxDoorSashHeight,
+        @PositiveOrZero @DecimalMax("300") Double couplingFace,
+        @PositiveOrZero @DecimalMax("100") Double couplingGap
 ) {
 }

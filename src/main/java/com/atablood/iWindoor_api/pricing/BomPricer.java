@@ -5,6 +5,7 @@ import com.atablood.iWindoor_api.dto.window.QuoteLine;
 import com.atablood.iWindoor_api.entity.*;
 import com.atablood.iWindoor_api.exception.BadRequestException;
 import com.atablood.iWindoor_api.repository.AccessoryRepository;
+import com.atablood.iWindoor_api.repository.ColorRepository;
 import com.atablood.iWindoor_api.repository.GlassRepository;
 import com.atablood.iWindoor_api.repository.HardwareRuleRepository;
 import com.atablood.iWindoor_api.repository.ProfileRepository;
@@ -18,16 +19,6 @@ import java.util.*;
 /**
  * İstemcinin çizim motorundan gelen kesim listesini (BOM) katalog fiyatlarıyla çarpar.
  * Miktarın kaynağı motor, fiyatın kaynağı sunucu.
- *
- * <pre>
- * Satır biçimi (1 pencere için):
- *  {"group":"PROFILE","role":"FRAME","length":1806,"qty":2,"cut":"45/45"}   role: FRAME|SASH|MULLION|SLIDE_SASH|ADAPTER|EXTENSION
- *  {"group":"BEAD","length":1198,"qty":4,"glassCode":"4+16+4"}               çıta, camın kalınlığına göre seçilir
- *  {"group":"DUPLEX","length":458,"qty":1}                                  aksesuar kodu DUPLEX (metre)
- *  {"group":"GLASS","glassCode":"4+16+4","w":408,"h":1086,"qty":1}
- *  {"group":"PANEL","glassCode":"PANEL-24","w":408,"h":1086,"qty":1}
- *  {"group":"HARDWARE","kind":"TILT_TURN","w":536,"h":1214,"qty":1}         donanım kurallarıyla aksesuara çevrilir
- * </pre>
  */
 @Service
 @RequiredArgsConstructor
@@ -35,16 +26,19 @@ public class BomPricer {
 
     public static final int MAX_LINES = 2000;
     public static final String DUPLEX_ACCESSORY_CODE = "DUPLEX";
-    private static final Set<String> GROUPS = Set.of("PROFILE", "BEAD", "DUPLEX", "GLASS", "PANEL", "HARDWARE");
-    private static final Set<String> ROLES = Set.of("FRAME", "SASH", "MULLION", "SLIDE_SASH", "ADAPTER", "EXTENSION");
-    private static final Set<String> HARDWARE_KINDS = Set.of("TURN", "TILT", "TILT_TURN", "SLIDE");
+    private static final Set<String> GROUPS = Set.of("PROFILE", "BEAD", "DUPLEX", "GLASS", "PANEL", "HARDWARE", "COLOR");
+    private static final Set<String> ROLES = Set.of(
+            "FRAME", "SASH", "MULLION", "SLIDE_SASH", "ADAPTER", "EXTENSION", "DOOR_SASH", "THRESHOLD", "COUPLING");
+    private static final Set<String> CUTS = Set.of("45/45", "90/90", "45/90");
+    private static final Set<String> HARDWARE_KINDS = Set.of(
+            "TURN", "TILT", "TILT_TURN", "SLIDE", "PASSIVE", "DOOR", "DOOR_PASSIVE");
 
     private final ProfileRepository profileRepository;
     private final GlassRepository glassRepository;
     private final AccessoryRepository accessoryRepository;
     private final HardwareRuleRepository hardwareRuleRepository;
+    private final ColorRepository colorRepository;
 
-    /** Satırların biçimini kontrol eder; hatalıysa BadRequestException (code=INVALID_BOM). */
     public void validate(List<Map<String, Object>> bom) {
         if (bom == null) return;
         List<Map<String, String>> errors = new ArrayList<>();
@@ -71,6 +65,10 @@ public class BomPricer {
                     if ("PROFILE".equals(group) && (!(l.get("role") instanceof String r) || !ROLES.contains(r))) {
                         errors.add(err(p + ".role", "Şunlardan biri olmalı: " + new TreeSet<>(ROLES)));
                     }
+                    Object cut = l.get("cut");
+                    if (cut != null && (!(cut instanceof String cs) || !CUTS.contains(cs))) {
+                        errors.add(err(p + ".cut", "Şunlardan biri olmalı: " + new TreeSet<>(CUTS)));
+                    }
                 }
                 case "HARDWARE" -> {
                     if (!(l.get("kind") instanceof String kind) || !HARDWARE_KINDS.contains(kind)) {
@@ -78,6 +76,14 @@ public class BomPricer {
                     }
                     if (!positive(l.get("w"), 12000)) errors.add(err(p + ".w", "0-12000 mm arası olmalı."));
                     if (!positive(l.get("h"), 12000)) errors.add(err(p + ".h", "0-12000 mm arası olmalı."));
+                }
+                case "COLOR" -> {
+                    if (!(l.get("colorCode") instanceof String cc) || cc.isBlank()) {
+                        errors.add(err(p + ".colorCode", "Renk kodu gerekli."));
+                    }
+                    if (qty instanceof Number qn && qn.intValue() != 1) {
+                        errors.add(err(p + ".qty", "COLOR satırında qty 1 olmalı."));
+                    }
                 }
                 default -> { // GLASS, PANEL
                     if (!positive(l.get("w"), 12000)) errors.add(err(p + ".w", "0-12000 mm arası olmalı."));
@@ -91,13 +97,13 @@ public class BomPricer {
         if (!errors.isEmpty()) throw new BadRequestException("INVALID_BOM", "Kesim listesi geçersiz.", errors);
     }
 
-    /** Bir adet pencerenin kesim listesini fiyatlar. Bulunamayan malzemeler 0 fiyatla ve uyarıyla döner. */
     public PricedBom price(Long companyId, Series series, List<Map<String, Object>> bom) {
         validate(bom);
         Set<String> warnings = new LinkedHashSet<>();
         Resolver r = new Resolver(companyId, series, warnings);
         Map<String, Acc> acc = new LinkedHashMap<>();
         String currency = "TRY";
+        String colorCode = null;
 
         for (Map<String, Object> l : bom == null ? List.<Map<String, Object>>of() : bom) {
             String group = (String) l.get("group");
@@ -107,8 +113,17 @@ public class BomPricer {
                     String role = (String) l.get("role");
                     ProfileType type = "SLIDE_SASH".equals(role) ? ProfileType.SASH : ProfileType.valueOf(role);
                     Profile pr = r.profile(type);
+                    if (pr == null && "DOOR_SASH".equals(role)) {
+                        pr = r.profile(ProfileType.SASH);
+                        if (pr != null) {
+                            warnings.add("Seride kapı kanadı profili yok; kanat profiliyle fiyatlandı.");
+                        } else {
+                            warnings.add("Seride DOOR_SASH profili yok; DOOR_SASH fiyatlanmadı.");
+                        }
+                    } else if (pr == null) {
+                        warnings.add("Seride " + type + " profili yok; " + role + " fiyatlanmadı.");
+                    }
                     double m = num(l.get("length")) / 1000.0 * qty;
-                    if (pr == null) warnings.add("Seride " + type + " profili yok; " + role + " fiyatlanmadı.");
                     add(acc, group, pr == null ? role : pr.getCode(), pr == null ? role : pr.getName(), m, "m",
                             pr == null ? BigDecimal.ZERO : pr.getPricePerMeter());
                     if (pr != null && pr.getCurrency() != null) currency = pr.getCurrency();
@@ -129,6 +144,9 @@ public class BomPricer {
                             a == null ? BigDecimal.ZERO : a.getPrice());
                 }
                 case "HARDWARE" -> applyHardware(r, acc, warnings, l, qty);
+                case "COLOR" -> {
+                    if (colorCode == null) colorCode = (String) l.get("colorCode");
+                }
                 default -> { // GLASS, PANEL
                     String code = (String) l.get("glassCode");
                     Glass g = r.glass(code);
@@ -142,11 +160,34 @@ public class BomPricer {
 
         List<QuoteLine> lines = new ArrayList<>();
         BigDecimal total = BigDecimal.ZERO;
+        BigDecimal profileBeadTotal = BigDecimal.ZERO;
         for (Acc a : acc.values()) {
             BigDecimal lineTotal = a.unitPrice.multiply(BigDecimal.valueOf(a.quantity)).setScale(2, RoundingMode.HALF_UP);
             lines.add(new QuoteLine(a.group, a.code, a.name, round(a.quantity, 3), a.unit, a.unitPrice, lineTotal));
             total = total.add(lineTotal);
+            if ("PROFILE".equals(a.group) || "BEAD".equals(a.group)) {
+                profileBeadTotal = profileBeadTotal.add(lineTotal);
+            }
         }
+
+        if (colorCode != null) {
+            Color color = r.color(colorCode);
+            if (color == null) {
+                warnings.add("Renk bulunamadı: " + colorCode);
+                lines.add(new QuoteLine("COLOR", colorCode, "Renk farkı – " + colorCode, 1, "—",
+                        BigDecimal.ZERO, BigDecimal.ZERO));
+            } else {
+                BigDecimal pct = color.getSurchargePct() == null ? BigDecimal.ZERO : color.getSurchargePct();
+                if (pct.signum() > 0) {
+                    BigDecimal fark = profileBeadTotal.multiply(pct)
+                            .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                    String name = "Renk farkı – " + color.getName() + " (%" + pct.stripTrailingZeros().toPlainString() + ")";
+                    lines.add(new QuoteLine("COLOR", color.getCode(), name, 1, "—", fark, fark));
+                    total = total.add(fark);
+                }
+            }
+        }
+
         return new PricedBom(lines, total.setScale(2, RoundingMode.HALF_UP), currency, new ArrayList<>(warnings));
     }
 
@@ -163,7 +204,7 @@ public class BomPricer {
             double quantity;
             if ("PER_PERIMETER_METER".equals(rule.getQtyType())) {
                 quantity = rule.getQty().doubleValue() * 2.0 * (w + h) / 1000.0 * lineQty;
-            } else { // PER_SASH
+            } else {
                 quantity = rule.getQty().doubleValue() * lineQty;
             }
             Accessory a = r.accessory(rule.getAccessoryCode());
@@ -223,7 +264,6 @@ public class BomPricer {
         }
     }
 
-    /** Katalog sorgularını bir fiyatlama boyunca önbellekler. */
     private final class Resolver {
         private final Long companyId;
         private final Long seriesId;
@@ -231,6 +271,7 @@ public class BomPricer {
         private final List<Profile> seriesProfiles;
         private final Map<String, Optional<Glass>> glasses = new HashMap<>();
         private final Map<String, Optional<Accessory>> accessories = new HashMap<>();
+        private final Map<String, Optional<Color>> colors = new HashMap<>();
         private final Map<String, List<HardwareRule>> hardwareByKind = new HashMap<>();
 
         Resolver(Long companyId, Series series, Set<String> warnings) {
@@ -268,6 +309,12 @@ public class BomPricer {
             return a;
         }
 
+        Color color(String code) {
+            Color col = colors.computeIfAbsent(code, c -> colorRepository.findFirstByCompanyIdAndCode(companyId, c)).orElse(null);
+            if (col != null && !col.isActive()) warnings.add("Pasif kayıt: " + col.getCode());
+            return col;
+        }
+
         List<HardwareRule> hardwareRules(String kind) {
             return hardwareByKind.computeIfAbsent(kind, k -> {
                 if (seriesId != null) {
@@ -280,7 +327,6 @@ public class BomPricer {
             });
         }
 
-        /** Önce aktif varsayılan / aktif ilk; aktif yoksa pasifler arasından + uyarı. */
         private Profile pick(List<Profile> list) {
             if (list.isEmpty()) return null;
             List<Profile> active = list.stream().filter(Profile::isActive).toList();

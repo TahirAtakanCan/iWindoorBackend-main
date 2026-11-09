@@ -5,6 +5,7 @@ import com.atablood.iWindoor_api.dto.window.QuoteLine;
 import com.atablood.iWindoor_api.entity.*;
 import com.atablood.iWindoor_api.exception.BadRequestException;
 import com.atablood.iWindoor_api.repository.AccessoryRepository;
+import com.atablood.iWindoor_api.repository.ColorRepository;
 import com.atablood.iWindoor_api.repository.GlassRepository;
 import com.atablood.iWindoor_api.repository.HardwareRuleRepository;
 import com.atablood.iWindoor_api.repository.ProfileRepository;
@@ -27,6 +28,7 @@ class BomPricerTest {
     private GlassRepository glasses;
     private AccessoryRepository accessories;
     private HardwareRuleRepository hardwareRules;
+    private ColorRepository colors;
     private BomPricer pricer;
     private Series series;
 
@@ -68,9 +70,11 @@ class BomPricerTest {
         glasses = mock(GlassRepository.class);
         accessories = mock(AccessoryRepository.class);
         hardwareRules = mock(HardwareRuleRepository.class);
-        pricer = new BomPricer(profiles, glasses, accessories, hardwareRules);
+        colors = mock(ColorRepository.class);
+        pricer = new BomPricer(profiles, glasses, accessories, hardwareRules, colors);
         series = new Series();
         series.setId(1L);
+        when(colors.findFirstByCompanyIdAndCode(anyLong(), anyString())).thenReturn(Optional.empty());
         when(profiles.findBySeries_IdOrderByIdAsc(1L)).thenReturn(List.of(
                 profile(1, ProfileType.FRAME, "K70-62", 180, null, null, true),
                 profile(2, ProfileType.SASH, "KN70-78", 195, null, null, true),
@@ -208,5 +212,103 @@ class BomPricerTest {
         assertThatThrownBy(() -> pricer.price(COMPANY, series, List.of(bad)))
                 .isInstanceOf(BadRequestException.class)
                 .satisfies(e -> assertThat(((BadRequestException) e).getCode()).isEqualTo("INVALID_BOM"));
+    }
+
+    @Test
+    void adapterUsesAd70Price() {
+        when(profiles.findBySeries_IdOrderByIdAsc(1L)).thenReturn(List.of(
+                profile(1, ProfileType.FRAME, "K70-62", 180, null, null, true),
+                profile(2, ProfileType.SASH, "KN70-78", 195, null, null, true),
+                profile(6, ProfileType.ADAPTER, "AD70", 120, null, null, true)));
+        Map<String, Object> line = bar("PROFILE", "ADAPTER", 1700, 1);
+        line.put("cut", "90/90");
+        PricedBom p = pricer.price(COMPANY, series, List.of(line));
+        assertThat(p.lines().get(0).code()).isEqualTo("AD70");
+        assertThat(p.lines().get(0).total()).isEqualByComparingTo("204.00"); // 1.7 m × 120
+        assertThat(p.warnings()).isEmpty();
+    }
+
+    @Test
+    void doorSashFallsBackToSashWithWarning() {
+        Map<String, Object> line = bar("PROFILE", "DOOR_SASH", 2000, 1);
+        PricedBom p = pricer.price(COMPANY, series, List.of(line));
+        assertThat(p.lines().get(0).code()).isEqualTo("KN70-78");
+        assertThat(p.lines().get(0).total()).isEqualByComparingTo("390.00"); // 2 m × 195
+        assertThat(p.warnings()).contains("Seride kapı kanadı profili yok; kanat profiliyle fiyatlandı.");
+    }
+
+    @Test
+    void doorHardwareQuantities() {
+        when(hardwareRules.findByCompanyIdAndSeriesIdIsNullAndKindOrderBySortOrderAscIdAsc(COMPANY, "DOOR"))
+                .thenReturn(List.of(
+                        rule("DOOR", "KAPI-KILIT-SET", "PER_SASH", 1, 10),
+                        rule("DOOR", "KAPI-KOLU", "PER_SASH", 1, 20),
+                        rule("DOOR", "KAPI-MENTESE", "PER_SASH", 3, 30),
+                        rule("DOOR", "CONTA-EPDM", "PER_PERIMETER_METER", 1, 40)));
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "KAPI-KILIT-SET"))
+                .thenReturn(Optional.of(accessory("KAPI-KILIT-SET", "Kapı kilit takımı", AccessoryUnit.SET, 950)));
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "KAPI-KOLU"))
+                .thenReturn(Optional.of(accessory("KAPI-KOLU", "Kapı kolu", AccessoryUnit.PIECE, 380)));
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "KAPI-MENTESE"))
+                .thenReturn(Optional.of(accessory("KAPI-MENTESE", "Kapı menteşesi", AccessoryUnit.PIECE, 140)));
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "CONTA-EPDM"))
+                .thenReturn(Optional.of(accessory("CONTA-EPDM", "EPDM conta", AccessoryUnit.METER, 12)));
+
+        Map<String, Object> hw = new LinkedHashMap<>();
+        hw.put("group", "HARDWARE");
+        hw.put("kind", "DOOR");
+        hw.put("w", 792);
+        hw.put("h", 2034);
+        hw.put("qty", 1);
+
+        PricedBom p = pricer.price(COMPANY, series, List.of(hw));
+        Map<String, QuoteLine> byCode = new HashMap<>();
+        for (QuoteLine l : p.lines()) byCode.put(l.code(), l);
+        assertThat(byCode.get("KAPI-KILIT-SET").quantity()).isEqualTo(1.0);
+        assertThat(byCode.get("KAPI-KOLU").quantity()).isEqualTo(1.0);
+        assertThat(byCode.get("KAPI-MENTESE").quantity()).isEqualTo(3.0);
+        assertThat(byCode.get("KAPI-MENTESE").total()).isEqualByComparingTo("420.00");
+        assertThat(byCode.get("CONTA-EPDM").quantity()).isEqualTo(5.652);
+        assertThat(byCode.get("CONTA-EPDM").unit()).isEqualTo("m");
+    }
+
+    @Test
+    void colorSurchargeOnProfileAndBead() {
+        Color ant = new Color();
+        ant.setCode("ANT-1");
+        ant.setName("Antrasit (tek yüz)");
+        ant.setSurchargePct(BigDecimal.valueOf(25));
+        ant.setActive(true);
+        when(colors.findFirstByCompanyIdAndCode(COMPANY, "ANT-1")).thenReturn(Optional.of(ant));
+
+        List<Map<String, Object>> bom = new ArrayList<>(sampleBom());
+        bom.add(new LinkedHashMap<>(Map.of("group", "COLOR", "colorCode", "ANT-1", "qty", 1)));
+
+        PricedBom without = pricer.price(COMPANY, series, sampleBom());
+        PricedBom with = pricer.price(COMPANY, series, bom);
+
+        BigDecimal profileBead = BigDecimal.ZERO;
+        for (QuoteLine l : without.lines()) {
+            if ("PROFILE".equals(l.group()) || "BEAD".equals(l.group())) profileBead = profileBead.add(l.total());
+        }
+        BigDecimal fark = profileBead.multiply(BigDecimal.valueOf(25))
+                .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+
+        QuoteLine colorLine = with.lines().stream().filter(l -> "COLOR".equals(l.group())).findFirst().orElseThrow();
+        assertThat(colorLine.code()).isEqualTo("ANT-1");
+        assertThat(colorLine.unit()).isEqualTo("—");
+        assertThat(colorLine.total()).isEqualByComparingTo(fark);
+        assertThat(with.total()).isEqualByComparingTo(without.total().add(fark));
+        assertThat(pricer.price(COMPANY, series, sampleBom()).total()).isEqualByComparingTo(without.total());
+    }
+
+    @Test
+    void unknownColorIsZeroWithWarning() {
+        List<Map<String, Object>> bom = new ArrayList<>(sampleBom());
+        bom.add(new LinkedHashMap<>(Map.of("group", "COLOR", "colorCode", "YOK", "qty", 1)));
+        PricedBom p = pricer.price(COMPANY, series, bom);
+        assertThat(p.warnings()).contains("Renk bulunamadı: YOK");
+        QuoteLine colorLine = p.lines().stream().filter(l -> "COLOR".equals(l.group())).findFirst().orElseThrow();
+        assertThat(colorLine.total()).isEqualByComparingTo("0");
     }
 }

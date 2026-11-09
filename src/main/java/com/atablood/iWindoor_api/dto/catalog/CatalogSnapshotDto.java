@@ -5,5 +5,5 @@ import java.util.List;
 
 /** İstemcinin çevrimdışı çizim için yerelde tuttuğu katalog paketi. */
 public record CatalogSnapshotDto(Instant generatedAt, List<SeriesDto> series, List<ProfileDto> profiles,
-                                 List<GlassDto> glasses, List<AccessoryDto> accessories) {
+                                 List<GlassDto> glasses, List<AccessoryDto> accessories, List<ColorDto> colors) {
 }
