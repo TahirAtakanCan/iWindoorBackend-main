@@ -2,19 +2,20 @@ package com.atablood.iWindoor_api.service;
 
 import com.atablood.iWindoor_api.design.DesignDocuments;
 import com.atablood.iWindoor_api.dto.company.CompanyDto;
+import com.atablood.iWindoor_api.dto.project.ProjectExtraItemDto;
 import com.atablood.iWindoor_api.dto.quote.ProjectQuoteDto;
+import com.atablood.iWindoor_api.dto.quote.ProjectQuoteDto.CostSummary;
 import com.atablood.iWindoor_api.dto.quote.ProjectQuoteDto.ProjectInfo;
 import com.atablood.iWindoor_api.dto.quote.ProjectQuoteDto.WindowQuoteLine;
 import com.atablood.iWindoor_api.dto.window.PricedBom;
 import com.atablood.iWindoor_api.dto.window.QuoteLine;
-import com.atablood.iWindoor_api.entity.Company;
-import com.atablood.iWindoor_api.entity.Project;
-import com.atablood.iWindoor_api.entity.User;
-import com.atablood.iWindoor_api.entity.WindowUnit;
+import com.atablood.iWindoor_api.entity.*;
 import com.atablood.iWindoor_api.exception.BadRequestException;
 import com.atablood.iWindoor_api.exception.NotFoundException;
 import com.atablood.iWindoor_api.pricing.BomPricer;
+import com.atablood.iWindoor_api.pricing.SalesPricer;
 import com.atablood.iWindoor_api.repository.CompanyRepository;
+import com.atablood.iWindoor_api.repository.ProjectExtraItemRepository;
 import com.atablood.iWindoor_api.repository.ProjectRepository;
 import com.atablood.iWindoor_api.security.AccessGuard;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +34,9 @@ public class ProjectQuoteService {
 
     private final ProjectRepository projectRepository;
     private final CompanyRepository companyRepository;
+    private final ProjectExtraItemRepository extraItemRepository;
     private final BomPricer bomPricer;
+    private final SalesPricingService salesPricingService;
     private final AccessGuard guard;
 
     @Transactional(readOnly = true)
@@ -56,6 +59,9 @@ public class ProjectQuoteService {
         List<WindowQuoteLine> windows = new ArrayList<>();
         List<QuoteLine> materialAcc = new ArrayList<>();
         BigDecimal subtotal = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal materialTotal = BigDecimal.ZERO;
+        BigDecimal laborTotal = BigDecimal.ZERO;
+        BigDecimal installTotal = BigDecimal.ZERO;
 
         for (WindowUnit unit : project.getWindowUnits()) {
             int qty = unit.getQuantity() == null || unit.getQuantity() < 1 ? 1 : unit.getQuantity();
@@ -65,31 +71,54 @@ public class ProjectQuoteService {
 
             List<QuoteLine> lines;
             List<String> warnings = new ArrayList<>();
-            BigDecimal unitPrice;
+            BigDecimal materialUnit;
 
             if (unit.getBomSnapshot() != null) {
                 PricedBom priced = bomPricer.price(company.getId(), unit.getSeries(), unit.getBomSnapshot());
                 lines = priced.lines();
-                unitPrice = priced.total();
+                materialUnit = priced.total();
                 warnings.addAll(priced.warnings());
             } else {
                 lines = List.of();
-                unitPrice = unit.getUnitPrice() == null
+                materialUnit = unit.getUnitPrice() == null
                         ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
                         : money(unit.getUnitPrice());
                 warnings.add("Kesim listesi yok; kayıtlı fiyat kullanıldı.");
             }
 
-            BigDecimal lineTotal = money(unitPrice.multiply(BigDecimal.valueOf(qty)));
+            // Satış hesabı için geçici material (önbellek güncellemeden)
+            WindowUnit probe = new WindowUnit();
+            probe.setWidth(unit.getWidth());
+            probe.setHeight(unit.getHeight());
+            probe.setSeries(unit.getSeries());
+            probe.setDesign(unit.getDesign());
+            probe.setUnitPrice(materialUnit);
+            probe.setSalePriceOverride(unit.getSalePriceOverride());
+            SalesPricer.SaleResult sale = salesPricingService.priceWindow(probe, company);
+            warnings.addAll(sale.warnings());
+
+            BigDecimal saleUnit = sale.unitPrice();
+            BigDecimal lineTotal = money(saleUnit.multiply(BigDecimal.valueOf(qty)));
             subtotal = money(subtotal.add(lineTotal));
+            materialTotal = materialTotal.add(materialUnit.multiply(BigDecimal.valueOf(qty)));
+            laborTotal = laborTotal.add(sale.breakdown().labor().multiply(BigDecimal.valueOf(qty)));
+            installTotal = installTotal.add(sale.breakdown().install().multiply(BigDecimal.valueOf(qty)));
 
             windows.add(new WindowQuoteLine(
                     unit.getId(), unit.getName(), qty, unit.getWidth(), unit.getHeight(),
-                    seriesName, design, unitPrice, lineTotal, lines, warnings));
+                    seriesName, design, money(materialUnit), saleUnit,
+                    unit.getSalePriceOverride() != null, lineTotal, lines, warnings));
 
             for (QuoteLine line : lines) {
                 materialAcc.add(scaleLine(line, qty));
             }
+        }
+
+        List<ProjectExtraItemDto> extras = new ArrayList<>();
+        for (ProjectExtraItem extra : extraItemRepository.findByProject_IdOrderBySortOrderAscIdAsc(projectId)) {
+            ProjectExtraItemDto dto = ProjectExtraItemDto.of(extra);
+            extras.add(dto);
+            subtotal = money(subtotal.add(dto.lineTotal()));
         }
 
         List<QuoteLine> materials = mergeMaterials(materialAcc);
@@ -100,6 +129,18 @@ public class ProjectQuoteService {
         BigDecimal vatAmount = money(netTotal.multiply(vatRate).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP));
         BigDecimal grandTotal = money(netTotal.add(vatAmount));
 
+        CostSummary costSummary = null;
+        if (user.getRole() == Role.COMPANY_ADMIN || user.getRole() == Role.ADMIN) {
+            materialTotal = money(materialTotal);
+            laborTotal = money(laborTotal);
+            installTotal = money(installTotal);
+            BigDecimal grossProfit = money(subtotal.subtract(materialTotal).subtract(laborTotal).subtract(installTotal));
+            BigDecimal grossMarginPct = subtotal.compareTo(BigDecimal.ZERO) == 0
+                    ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                    : money(grossProfit.multiply(new BigDecimal("100")).divide(subtotal, 4, RoundingMode.HALF_UP));
+            costSummary = new CostSummary(materialTotal, laborTotal, installTotal, subtotal, grossProfit, grossMarginPct);
+        }
+
         int validityDays = company.getQuoteValidityDays() == null ? 15 : company.getQuoteValidityDays();
 
         return new ProjectQuoteDto(
@@ -109,6 +150,7 @@ public class ProjectQuoteService {
                 CompanyDto.of(company),
                 ProjectInfo.of(project),
                 windows,
+                extras,
                 materials,
                 subtotal,
                 discountPct,
@@ -116,7 +158,8 @@ public class ProjectQuoteService {
                 netTotal,
                 vatRate,
                 vatAmount,
-                grandTotal
+                grandTotal,
+                costSummary
         );
     }
 

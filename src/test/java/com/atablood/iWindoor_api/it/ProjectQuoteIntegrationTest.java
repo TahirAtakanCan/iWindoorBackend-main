@@ -76,27 +76,29 @@ class ProjectQuoteIntegrationTest {
         String t1 = register(), t2 = register();
         String project = projectWithPricedWindow(t1);
 
+        // Malzeme 4816.31 → COST_PLUS satış 8846.90 × 2 = 17693.80
         call(get("/api/v1/projects/" + project + "/quote"), t1, null)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.subtotal").value(9632.62))
+                .andExpect(jsonPath("$.subtotal").value(17693.80))
                 .andExpect(jsonPath("$.discountPct").value(0))
                 .andExpect(jsonPath("$.discountAmount").value(0))
-                .andExpect(jsonPath("$.netTotal").value(9632.62))
+                .andExpect(jsonPath("$.netTotal").value(17693.80))
                 .andExpect(jsonPath("$.vatRate").value(20))
-                .andExpect(jsonPath("$.vatAmount").value(1926.52))
-                .andExpect(jsonPath("$.grandTotal").value(11559.14))
-                .andExpect(jsonPath("$.windows[0].unitPrice").value(4816.31))
-                .andExpect(jsonPath("$.windows[0].lineTotal").value(9632.62))
+                .andExpect(jsonPath("$.vatAmount").value(3538.76))
+                .andExpect(jsonPath("$.grandTotal").value(21232.56))
+                .andExpect(jsonPath("$.windows[0].materialUnitPrice").value(4816.31))
+                .andExpect(jsonPath("$.windows[0].saleUnitPrice").value(8846.90))
+                .andExpect(jsonPath("$.windows[0].lineTotal").value(17693.80))
                 .andExpect(jsonPath("$.materials.length()", greaterThan(0)));
 
         call(get("/api/v1/projects/" + project + "/quote").param("discountPct", "10"), t1, null)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.subtotal").value(9632.62))
+                .andExpect(jsonPath("$.subtotal").value(17693.80))
                 .andExpect(jsonPath("$.discountPct").value(10))
-                .andExpect(jsonPath("$.discountAmount").value(963.26))
-                .andExpect(jsonPath("$.netTotal").value(8669.36))
-                .andExpect(jsonPath("$.vatAmount").value(1733.87))
-                .andExpect(jsonPath("$.grandTotal").value(10403.23));
+                .andExpect(jsonPath("$.discountAmount").value(1769.38))
+                .andExpect(jsonPath("$.netTotal").value(15924.42))
+                .andExpect(jsonPath("$.vatAmount").value(3184.88))
+                .andExpect(jsonPath("$.grandTotal").value(19109.30));
 
         call(get("/api/v1/projects/" + project + "/quote"), t2, null).andExpect(status().isForbidden());
     }

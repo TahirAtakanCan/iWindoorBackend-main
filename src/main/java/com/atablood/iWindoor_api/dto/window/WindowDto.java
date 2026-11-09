@@ -24,6 +24,8 @@ public record WindowDto(
         boolean legacyDesign,
         List<Map<String, Object>> bom,
         BigDecimal unitPrice,
+        BigDecimal saleUnitPrice,
+        BigDecimal salePriceOverride,
         Long rowVersion,
         LocalDateTime updatedAt
 ) {
@@ -32,6 +34,7 @@ public record WindowDto(
         return new WindowDto(u.getId(), u.getProject() == null ? null : u.getProject().getId(), u.getName(),
                 u.getWidth(), u.getHeight(), u.getQuantity(), u.getSeriesId(),
                 legacy ? DesignDocuments.fromLegacy(u) : u.getDesign(), legacy,
-                u.getBomSnapshot(), u.getUnitPrice(), u.getRowVersion(), u.getUpdatedAt());
+                u.getBomSnapshot(), u.getUnitPrice(), u.getSaleUnitPrice(), u.getSalePriceOverride(),
+                u.getRowVersion(), u.getUpdatedAt());
     }
 }

@@ -32,6 +32,7 @@ public class WindowService {
     private final CatalogService catalogService;
     private final CatalogProvisioningService provisioning;
     private final PricingService pricingService;
+    private final SalesPricingService salesPricingService;
     private final AccessGuard guard;
 
     @Transactional
@@ -91,12 +92,14 @@ public class WindowService {
         unit.setWidth(((Number) req.design().get("width")).doubleValue());
         unit.setHeight(((Number) req.design().get("height")).doubleValue());
         unit.setBomSnapshot(req.bom());
+        Long companyId = guard.companyId(user);
         unit.setUnitPrice(req.bom() == null ? null
-                : bomPricer.price(guard.companyId(user), unit.getSeries(), req.bom()).total());
+                : bomPricer.price(companyId, unit.getSeries(), req.bom()).total());
+        salesPricingService.applyWindow(unit, companyId);
 
         WindowUnit saved = windowUnitRepository.saveAndFlush(unit);
         pricingService.calculateProjectPrice(saved.getProject().getId());
-        return WindowDto.of(saved);
+        return WindowDto.of(windowUnitRepository.findById(saved.getId()).orElse(saved));
     }
 
     @Transactional
@@ -109,14 +112,34 @@ public class WindowService {
         pricingService.calculateProjectPrice(project.getId());
     }
 
+    /** Satış fiyatı geçersiz kılma; rowVersion gerekmez. */
+    @Transactional
+    public WindowDto updateSalePriceOverride(Long id, BigDecimal override, User user) {
+        WindowUnit unit = load(id, user);
+        unit.setSalePriceOverride(override == null ? null : override.setScale(2, RoundingMode.HALF_UP));
+        windowUnitRepository.saveAndFlush(unit);
+        salesPricingService.recalculateProjectSales(unit.getProject().getId());
+        return WindowDto.of(windowUnitRepository.findById(id).orElse(unit));
+    }
+
     /** İçe aktarmada: kesim listesini doğrula, kaydet ve güncel katalogdan unitPrice hesapla. */
     @Transactional
     public void applyBomAndPrice(Long windowId, List<Map<String, Object>> bom, User user) {
         WindowUnit unit = load(windowId, user);
         bomPricer.validate(bom);
         unit.setBomSnapshot(bom);
+        Long companyId = guard.companyId(user);
         unit.setUnitPrice(bom == null ? null
-                : bomPricer.price(guard.companyId(user), unit.getSeries(), bom).total());
+                : bomPricer.price(companyId, unit.getSeries(), bom).total());
+        salesPricingService.applyWindow(unit, companyId);
+        windowUnitRepository.saveAndFlush(unit);
+    }
+
+    /** İçe aktarmada satış override uygula (sonra proje satış toplamı yeniden hesaplanır). */
+    @Transactional
+    public void applySalePriceOverride(Long windowId, BigDecimal override, User user) {
+        WindowUnit unit = load(windowId, user);
+        unit.setSalePriceOverride(override == null ? null : override.setScale(2, RoundingMode.HALF_UP));
         windowUnitRepository.saveAndFlush(unit);
     }
 

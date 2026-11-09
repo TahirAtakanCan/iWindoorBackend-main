@@ -1,6 +1,7 @@
 package com.atablood.iWindoor_api.controller;
 
 import com.atablood.iWindoor_api.dto.window.QuoteDto;
+import com.atablood.iWindoor_api.dto.window.SalePriceOverrideRequest;
 import com.atablood.iWindoor_api.dto.window.WindowDto;
 import com.atablood.iWindoor_api.dto.window.WindowUpdateRequest;
 import com.atablood.iWindoor_api.entity.User;
@@ -28,6 +29,12 @@ public class WindowController {
     public WindowDto update(@PathVariable Long id, @Valid @RequestBody WindowUpdateRequest request,
                             @AuthenticationPrincipal User user) {
         return windowService.update(id, request, user);
+    }
+
+    @PutMapping("/{id}/sale-price")
+    public WindowDto updateSalePrice(@PathVariable Long id, @Valid @RequestBody SalePriceOverrideRequest request,
+                                     @AuthenticationPrincipal User user) {
+        return windowService.updateSalePriceOverride(id, request.override(), user);
     }
 
     @DeleteMapping("/{id}")

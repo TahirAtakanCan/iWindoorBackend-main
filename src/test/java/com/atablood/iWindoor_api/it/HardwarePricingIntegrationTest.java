@@ -87,7 +87,8 @@ class HardwarePricingIntegrationTest {
 
         call(get("/api/v1/projects/" + project + "/quote"), token, null)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.windows[0].unitPrice").value(5758.31))
+                .andExpect(jsonPath("$.windows[0].materialUnitPrice").value(5758.31))
+                .andExpect(jsonPath("$.windows[0].saleUnitPrice").value(10071.50))
                 .andExpect(jsonPath("$.materials[?(@.group=='ACCESSORY')].code", hasItem("KOL-STD")))
                 .andExpect(jsonPath("$.materials[?(@.group=='ACCESSORY')].code", hasItem("CIFT-ACILIM-SET")))
                 .andExpect(jsonPath("$.materials[?(@.group=='ACCESSORY')].code", hasItem("CONTA-EPDM")));

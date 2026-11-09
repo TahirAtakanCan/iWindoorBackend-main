@@ -38,9 +38,13 @@ public class Project {
     @Column(name = "customer_address", length = 500)
     private String customerAddress;
 
-    // Proje toplam tutarı (Hesaplama sonucu güncellenir)
+    // Proje malzeme toplam tutarı (Hesaplama sonucu güncellenir)
     @Column(name = "total_price")
     private BigDecimal totalPrice;
+
+    /** İskonto/KDV öncesi satış ara toplamı (önbellek). */
+    @Column(name = "sale_total", precision = 14, scale = 2)
+    private BigDecimal saleTotal;
 
     @Column(name = "currency")
     private String currency = "TRY";

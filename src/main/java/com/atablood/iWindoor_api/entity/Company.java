@@ -70,6 +70,22 @@ public class Company {
     @Column(name = "glass_order_note", length = 1000)
     private String glassOrderNote;
 
+    /** COST_PLUS | PER_M2 */
+    @Column(name = "pricing_mode", nullable = false, length = 16)
+    private String pricingMode = "COST_PLUS";
+
+    @Column(name = "profit_margin_pct", nullable = false, precision = 6, scale = 2)
+    private BigDecimal profitMarginPct = new BigDecimal("30.00");
+
+    @Column(name = "labor_per_m2", nullable = false, precision = 12, scale = 2)
+    private BigDecimal laborPerM2 = new BigDecimal("400.00");
+
+    @Column(name = "install_per_m2", nullable = false, precision = 12, scale = 2)
+    private BigDecimal installPerM2 = new BigDecimal("250.00");
+
+    @Column(name = "min_billable_area_m2", nullable = false, precision = 6, scale = 2)
+    private BigDecimal minBillableAreaM2 = new BigDecimal("1.00");
+
     // Şirkete bağlı çalışanlar
     @OneToMany(mappedBy = "company", cascade = CascadeType.ALL)
     @JsonManagedReference

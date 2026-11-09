@@ -12,6 +12,7 @@ import com.atablood.iWindoor_api.repository.ProjectRepository;
 import com.atablood.iWindoor_api.security.AccessGuard;
 import com.atablood.iWindoor_api.service.PricingService;
 import com.atablood.iWindoor_api.service.ProjectService;
+import com.atablood.iWindoor_api.service.SalesPricingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +25,7 @@ public class ProjectServiceImpl implements ProjectService {
 
     private final ProjectRepository projectRepository;
     private final PricingService pricingService;
+    private final SalesPricingService salesPricingService;
     private final AccessGuard guard;
 
     @Override
@@ -54,15 +56,22 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
+    @Transactional
     public List<Project> getAllProjects(User currentUser) {
-        return projectRepository.findAllByCreatedBy_Company_Id(guard.companyId(currentUser));
+        List<Project> projects = projectRepository.findAllByCreatedBy_Company_Id(guard.companyId(currentUser));
+        for (Project p : projects) {
+            if (p.getSaleTotal() == null) salesPricingService.ensureSaleTotal(p);
+        }
+        return projects;
     }
 
     @Override
+    @Transactional
     public Project getProject(Long id, User currentUser) {
         Project project = projectRepository.findById(id).orElseThrow(() -> new NotFoundException("Proje", id));
         guard.checkProject(project, currentUser);
-        return project;
+        if (project.getSaleTotal() == null) salesPricingService.ensureSaleTotal(project);
+        return projectRepository.findById(id).orElse(project);
     }
 
     @Override

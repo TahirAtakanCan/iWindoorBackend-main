@@ -2,7 +2,9 @@ package com.atablood.iWindoor_api.service;
 
 import com.atablood.iWindoor_api.design.DesignDocuments;
 import com.atablood.iWindoor_api.design.DesignDocumentValidator;
+import com.atablood.iWindoor_api.dto.project.ProjectExtraItemDto;
 import com.atablood.iWindoor_api.dto.project.ProjectFileDto;
+import com.atablood.iWindoor_api.dto.project.ProjectFileDto.ExtraPart;
 import com.atablood.iWindoor_api.dto.project.ProjectFileDto.ProjectPart;
 import com.atablood.iWindoor_api.dto.project.ProjectFileDto.WindowPart;
 import com.atablood.iWindoor_api.dto.project.ProjectRequest;
@@ -15,6 +17,7 @@ import com.atablood.iWindoor_api.entity.WindowUnit;
 import com.atablood.iWindoor_api.exception.BadRequestException;
 import com.atablood.iWindoor_api.exception.NotFoundException;
 import com.atablood.iWindoor_api.pricing.BomPricer;
+import com.atablood.iWindoor_api.repository.ProjectExtraItemRepository;
 import com.atablood.iWindoor_api.repository.ProjectRepository;
 import com.atablood.iWindoor_api.repository.SeriesRepository;
 import com.atablood.iWindoor_api.security.AccessGuard;
@@ -27,6 +30,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.*;
 
@@ -40,8 +44,10 @@ public class ProjectFileService {
 
     private final ProjectRepository projectRepository;
     private final SeriesRepository seriesRepository;
+    private final ProjectExtraItemRepository extraItemRepository;
     private final ProjectService projectService;
     private final WindowService windowService;
+    private final ProjectExtraItemService extraItemService;
     private final CatalogService catalogService;
     private final CatalogProvisioningService provisioning;
     private final PricingService pricingService;
@@ -68,9 +74,14 @@ public class ProjectFileService {
                     unit.getHeight(),
                     seriesName,
                     design,
-                    legacy ? null : unit.getBomSnapshot()
+                    legacy ? null : unit.getBomSnapshot(),
+                    unit.getSalePriceOverride()
             ));
         }
+
+        List<ExtraPart> extras = extraItemRepository.findByProject_IdOrderBySortOrderAscIdAsc(projectId).stream()
+                .map(e -> new ExtraPart(e.getName(), e.getQuantity(), e.getUnit(), e.getUnitPrice(), e.getSortOrder()))
+                .toList();
 
         ProjectFileDto body = new ProjectFileDto(
                 FORMAT,
@@ -83,7 +94,8 @@ public class ProjectFileService {
                         project.getCustomerPhone(),
                         project.getCustomerEmail(),
                         project.getCustomerAddress()),
-                windows
+                windows,
+                extras
         );
 
         String filename = asciiSlug(project.getName()) + ".iwd";
@@ -153,6 +165,21 @@ public class ProjectFileService {
                 bomPricer.validate(w.bom());
                 windowService.applyBomAndPrice(created.id(), w.bom(), user);
             }
+            if (w.salePriceOverride() != null) {
+                windowService.applySalePriceOverride(created.id(), w.salePriceOverride(), user);
+            }
+        }
+
+        if (file.extras() != null) {
+            for (ExtraPart e : file.extras()) {
+                if (e == null || e.name() == null || e.name().isBlank() || e.unitPrice() == null) continue;
+                BigDecimal qty = e.quantity() == null ? BigDecimal.ONE : e.quantity();
+                String unit = e.unit() == null || e.unit().isBlank() ? "adet" : e.unit();
+                extraItemService.create(project.getId(),
+                        new ProjectExtraItemDto.Request(e.name(), qty, unit, e.unitPrice(),
+                                e.sortOrder() == null ? 0 : e.sortOrder()),
+                        user);
+            }
         }
 
         pricingService.calculateProjectPrice(project.getId());
@@ -205,4 +232,3 @@ public class ProjectFileService {
         return out.toString();
     }
 }
-

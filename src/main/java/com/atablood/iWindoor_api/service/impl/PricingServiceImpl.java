@@ -9,6 +9,7 @@ import com.atablood.iWindoor_api.exception.NotFoundException;
 import com.atablood.iWindoor_api.pricing.BomPricer;
 import com.atablood.iWindoor_api.repository.ProjectRepository;
 import com.atablood.iWindoor_api.service.PricingService;
+import com.atablood.iWindoor_api.service.SalesPricingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,7 @@ public class PricingServiceImpl implements PricingService {
 
     private final ProjectRepository projectRepository;
     private final BomPricer bomPricer;
+    private final SalesPricingService salesPricingService;
 
     @Override
     @Transactional
@@ -45,6 +47,7 @@ public class PricingServiceImpl implements PricingService {
         }
         project.setTotalPrice(total.setScale(2, RoundingMode.HALF_UP));
         projectRepository.save(project);
+        salesPricingService.recalculateProjectSales(projectId);
     }
 
     @Override

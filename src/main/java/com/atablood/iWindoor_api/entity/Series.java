@@ -119,4 +119,8 @@ public class Series {
 
     @Column(name = "coupling_gap_mm", nullable = false)
     private Double couplingGapMm = 0.0;
+
+    /** PER_M2 modunda kullanılan satış birim fiyatı (₺/m²); null ise COST_PLUS'a düşülür. */
+    @Column(name = "sale_price_per_m2", precision = 12, scale = 2)
+    private java.math.BigDecimal salePricePerM2;
 }

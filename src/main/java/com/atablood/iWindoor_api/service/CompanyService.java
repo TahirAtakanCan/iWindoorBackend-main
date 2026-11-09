@@ -13,12 +13,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
 public class CompanyService {
 
     private final CompanyRepository companyRepository;
+    private final SalesPricingService salesPricingService;
     private final AccessGuard guard;
 
     @Transactional(readOnly = true)
@@ -29,6 +31,7 @@ public class CompanyService {
     @Transactional
     public CompanyDto updateMine(CompanyUpdateRequest req, User user) {
         Company c = load(user);
+        boolean pricingChanged = pricingChanged(c, req);
         c.setName(req.name().trim());
         c.setAddress(req.address());
         c.setTaxNumber(req.taxNumber());
@@ -47,7 +50,24 @@ public class CompanyService {
         c.setGlassSupplierPhone(req.glassSupplierPhone());
         c.setGlassSupplierEmail(req.glassSupplierEmail());
         c.setGlassOrderNote(req.glassOrderNote());
-        return CompanyDto.of(companyRepository.save(c));
+        c.setPricingMode(req.pricingMode());
+        c.setProfitMarginPct(money(req.profitMarginPct()));
+        c.setLaborPerM2(money(req.laborPerM2()));
+        c.setInstallPerM2(money(req.installPerM2()));
+        c.setMinBillableAreaM2(money(req.minBillableAreaM2()));
+        Company saved = companyRepository.save(c);
+        if (pricingChanged) {
+            salesPricingService.recalculateCompanySales(saved.getId());
+        }
+        return CompanyDto.of(saved);
+    }
+
+    private static boolean pricingChanged(Company c, CompanyUpdateRequest req) {
+        return !Objects.equals(c.getPricingMode(), req.pricingMode())
+                || money(c.getProfitMarginPct()).compareTo(money(req.profitMarginPct())) != 0
+                || money(c.getLaborPerM2()).compareTo(money(req.laborPerM2())) != 0
+                || money(c.getInstallPerM2()).compareTo(money(req.installPerM2())) != 0
+                || money(c.getMinBillableAreaM2()).compareTo(money(req.minBillableAreaM2())) != 0;
     }
 
     private Company load(User user) {
@@ -56,7 +76,7 @@ public class CompanyService {
     }
 
     private static BigDecimal money(BigDecimal v) {
-        return v.setScale(2, RoundingMode.HALF_UP);
+        return v == null ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP) : v.setScale(2, RoundingMode.HALF_UP);
     }
 
     private static BigDecimal mm1(BigDecimal v) {

@@ -32,7 +32,16 @@ public class WindowUnit {
 
     private Integer quantity = 1;
 
+    /** Malzeme birim maliyeti (BomPricer). */
     private BigDecimal unitPrice;
+
+    /** Manuel satış birim fiyatı; doluysa hesaplanan satış yerine kullanılır. */
+    @Column(name = "sale_price_override", precision = 12, scale = 2)
+    private BigDecimal salePriceOverride;
+
+    /** Hesaplanmış satış birim fiyatı (önbellek). */
+    @Column(name = "sale_unit_price", precision = 12, scale = 2)
+    private BigDecimal saleUnitPrice;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id", nullable = false)

@@ -23,7 +23,12 @@ public record CompanyDto(
         String glassSupplierName,
         String glassSupplierPhone,
         String glassSupplierEmail,
-        String glassOrderNote
+        String glassOrderNote,
+        String pricingMode,
+        BigDecimal profitMarginPct,
+        BigDecimal laborPerM2,
+        BigDecimal installPerM2,
+        BigDecimal minBillableAreaM2
 ) {
     public static CompanyDto of(Company c) {
         return new CompanyDto(
@@ -45,7 +50,12 @@ public record CompanyDto(
                 c.getGlassSupplierName(),
                 c.getGlassSupplierPhone(),
                 c.getGlassSupplierEmail(),
-                c.getGlassOrderNote()
+                c.getGlassOrderNote(),
+                c.getPricingMode(),
+                c.getProfitMarginPct(),
+                c.getLaborPerM2(),
+                c.getInstallPerM2(),
+                c.getMinBillableAreaM2()
         );
     }
 }

@@ -2,6 +2,7 @@ package com.atablood.iWindoor_api.controller;
 
 import com.atablood.iWindoor_api.dto.ProjectCostSummaryDTO;
 import com.atablood.iWindoor_api.dto.ProjectSpecsDTO;
+import com.atablood.iWindoor_api.dto.project.ProjectExtraItemDto;
 import com.atablood.iWindoor_api.dto.project.ProjectFileDto;
 import com.atablood.iWindoor_api.dto.project.ProjectRequest;
 import com.atablood.iWindoor_api.dto.quote.ProjectQuoteDto;
@@ -9,6 +10,7 @@ import com.atablood.iWindoor_api.dto.window.WindowCreateRequest;
 import com.atablood.iWindoor_api.dto.window.WindowDto;
 import com.atablood.iWindoor_api.entity.Project;
 import com.atablood.iWindoor_api.entity.User;
+import com.atablood.iWindoor_api.service.ProjectExtraItemService;
 import com.atablood.iWindoor_api.service.ProjectFileService;
 import com.atablood.iWindoor_api.service.ProjectQuoteService;
 import com.atablood.iWindoor_api.service.ProjectService;
@@ -31,6 +33,7 @@ public class ProjectController {
     private final WindowService windowService;
     private final ProjectQuoteService projectQuoteService;
     private final ProjectFileService projectFileService;
+    private final ProjectExtraItemService extraItemService;
 
     @PostMapping
     public Project createProject(@Valid @RequestBody ProjectRequest request, @AuthenticationPrincipal User currentUser) {
@@ -104,5 +107,30 @@ public class ProjectController {
     @GetMapping("/{id}/specs")
     public ProjectSpecsDTO getProjectSpecs(@PathVariable Long id, @AuthenticationPrincipal User currentUser) {
         return projectService.getProjectSpecs(id, currentUser);
+    }
+
+    @GetMapping("/{id}/extras")
+    public List<ProjectExtraItemDto> listExtras(@PathVariable Long id, @AuthenticationPrincipal User currentUser) {
+        return extraItemService.list(id, currentUser);
+    }
+
+    @PostMapping("/{id}/extras")
+    public ProjectExtraItemDto createExtra(@PathVariable Long id, @Valid @RequestBody ProjectExtraItemDto.Request request,
+                                           @AuthenticationPrincipal User currentUser) {
+        return extraItemService.create(id, request, currentUser);
+    }
+
+    @PutMapping("/{id}/extras/{itemId}")
+    public ProjectExtraItemDto updateExtra(@PathVariable Long id, @PathVariable Long itemId,
+                                           @Valid @RequestBody ProjectExtraItemDto.Request request,
+                                           @AuthenticationPrincipal User currentUser) {
+        return extraItemService.update(id, itemId, request, currentUser);
+    }
+
+    @DeleteMapping("/{id}/extras/{itemId}")
+    public ResponseEntity<Void> deleteExtra(@PathVariable Long id, @PathVariable Long itemId,
+                                            @AuthenticationPrincipal User currentUser) {
+        extraItemService.delete(id, itemId, currentUser);
+        return ResponseEntity.noContent().build();
     }
 }

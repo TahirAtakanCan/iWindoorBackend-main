@@ -1,6 +1,7 @@
 package com.atablood.iWindoor_api.dto.quote;
 
 import com.atablood.iWindoor_api.dto.company.CompanyDto;
+import com.atablood.iWindoor_api.dto.project.ProjectExtraItemDto;
 import com.atablood.iWindoor_api.dto.window.QuoteLine;
 import com.atablood.iWindoor_api.entity.Project;
 
@@ -17,6 +18,7 @@ public record ProjectQuoteDto(
         CompanyDto company,
         ProjectInfo project,
         List<WindowQuoteLine> windows,
+        List<ProjectExtraItemDto> extras,
         List<QuoteLine> materials,
         BigDecimal subtotal,
         BigDecimal discountPct,
@@ -24,7 +26,8 @@ public record ProjectQuoteDto(
         BigDecimal netTotal,
         BigDecimal vatRate,
         BigDecimal vatAmount,
-        BigDecimal grandTotal
+        BigDecimal grandTotal,
+        CostSummary costSummary
 ) {
     public record ProjectInfo(
             Long id,
@@ -49,10 +52,22 @@ public record ProjectQuoteDto(
             Double height,
             String seriesName,
             Map<String, Object> design,
-            BigDecimal unitPrice,
+            BigDecimal materialUnitPrice,
+            BigDecimal saleUnitPrice,
+            boolean overridden,
             BigDecimal lineTotal,
             List<QuoteLine> lines,
             List<String> warnings
+    ) {
+    }
+
+    public record CostSummary(
+            BigDecimal materialTotal,
+            BigDecimal laborTotal,
+            BigDecimal installTotal,
+            BigDecimal saleSubtotal,
+            BigDecimal grossProfit,
+            BigDecimal grossMarginPct
     ) {
     }
 }

@@ -1,5 +1,6 @@
 package com.atablood.iWindoor_api.dto.project;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -10,7 +11,8 @@ public record ProjectFileDto(
         Integer version,
         Instant exportedAt,
         ProjectPart project,
-        List<WindowPart> windows
+        List<WindowPart> windows,
+        List<ExtraPart> extras
 ) {
     public record ProjectPart(
             String name,
@@ -29,7 +31,17 @@ public record ProjectFileDto(
             Double height,
             String seriesName,
             Map<String, Object> design,
-            List<Map<String, Object>> bom
+            List<Map<String, Object>> bom,
+            BigDecimal salePriceOverride
+    ) {
+    }
+
+    public record ExtraPart(
+            String name,
+            BigDecimal quantity,
+            String unit,
+            BigDecimal unitPrice,
+            Integer sortOrder
     ) {
     }
 }

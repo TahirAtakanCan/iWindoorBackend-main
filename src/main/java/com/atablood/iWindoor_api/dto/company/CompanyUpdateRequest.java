@@ -22,6 +22,11 @@ public record CompanyUpdateRequest(
         @Size(max = 200) String glassSupplierName,
         @Size(max = 50) String glassSupplierPhone,
         @Size(max = 200) String glassSupplierEmail,
-        @Size(max = 1000) String glassOrderNote
+        @Size(max = 1000) String glassOrderNote,
+        @NotBlank @Pattern(regexp = "COST_PLUS|PER_M2") String pricingMode,
+        @NotNull @DecimalMin("0") @DecimalMax("500") BigDecimal profitMarginPct,
+        @NotNull @DecimalMin("0") BigDecimal laborPerM2,
+        @NotNull @DecimalMin("0") BigDecimal installPerM2,
+        @NotNull @DecimalMin("0") @DecimalMax("10") BigDecimal minBillableAreaM2
 ) {
 }

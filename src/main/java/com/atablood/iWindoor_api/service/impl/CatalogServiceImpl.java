@@ -14,6 +14,7 @@ import com.atablood.iWindoor_api.repository.SeriesRepository;
 import com.atablood.iWindoor_api.security.AccessGuard;
 import com.atablood.iWindoor_api.service.CatalogProvisioningService;
 import com.atablood.iWindoor_api.service.CatalogService;
+import com.atablood.iWindoor_api.service.SalesPricingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +43,7 @@ public class CatalogServiceImpl implements CatalogService {
     private final HardwareRuleRepository hardwareRuleRepository;
     private final ColorRepository colorRepository;
     private final CatalogProvisioningService provisioning;
+    private final SalesPricingService salesPricingService;
     private final AccessGuard guard;
 
     private Long company(User user) {
@@ -84,8 +86,19 @@ public class CatalogServiceImpl implements CatalogService {
     public SeriesDto updateSeries(Long id, SeriesRequest r, User user) {
         Series s = seriesRepository.findById(id).orElseThrow(() -> new NotFoundException("Seri", id));
         guard.checkCatalogWrite(s.getCompanyId(), user);
+        BigDecimal beforeM2 = s.getSalePricePerM2();
         apply(s, r);
-        return SeriesDto.of(seriesRepository.save(s));
+        Series saved = seriesRepository.save(s);
+        if (!sameMoney(beforeM2, saved.getSalePricePerM2()) && saved.getCompanyId() != null) {
+            salesPricingService.recalculateSeriesSales(saved.getCompanyId(), saved.getId());
+        }
+        return SeriesDto.of(saved);
+    }
+
+    private static boolean sameMoney(BigDecimal a, BigDecimal b) {
+        if (a == null && b == null) return true;
+        if (a == null || b == null) return false;
+        return a.compareTo(b) == 0;
     }
 
     private static void apply(Series s, SeriesRequest r) {
@@ -93,6 +106,8 @@ public class CatalogServiceImpl implements CatalogService {
         s.setBrand(r.brand());
         s.setSystemDepth(r.systemDepthMm());
         if (r.material() != null) s.setMaterial(r.material());
+        s.setSalePricePerM2(r.salePricePerM2() == null ? null
+                : r.salePricePerM2().setScale(2, RoundingMode.HALF_UP));
         SeriesGeometryRequest g = r.geometry();
         if (g == null) return;
         set(g.frameFace(), s::setFrameFaceMm);

@@ -56,7 +56,8 @@ class CompanyApiIntegrationTest {
              "phone":"03121234567","email":"info@firma.test","vatRate":18,"defaultDiscountPct":5,
              "currency":"TRY","quoteNote":"Teşekkürler","quoteValidityDays":30,
              "sawKerfMm":4,"barTrimMm":10,"minOffcutMm":500,
-             "glassSupplierName":null,"glassSupplierPhone":null,"glassSupplierEmail":null,"glassOrderNote":null}""";
+             "glassSupplierName":null,"glassSupplierPhone":null,"glassSupplierEmail":null,"glassOrderNote":null,
+             "pricingMode":"COST_PLUS","profitMarginPct":30,"laborPerM2":400,"installPerM2":250,"minBillableAreaM2":1.00}""";
 
     @Test
     void companyAdminCanUpdateDefaults_employeeForbidden() throws Exception {
@@ -70,7 +71,9 @@ class CompanyApiIntegrationTest {
                 .andExpect(jsonPath("$.quoteValidityDays").value(15))
                 .andExpect(jsonPath("$.sawKerfMm").value(4))
                 .andExpect(jsonPath("$.barTrimMm").value(10))
-                .andExpect(jsonPath("$.minOffcutMm").value(500));
+                .andExpect(jsonPath("$.minOffcutMm").value(500))
+                .andExpect(jsonPath("$.pricingMode").value("COST_PLUS"))
+                .andExpect(jsonPath("$.profitMarginPct").value(30));
 
         call(put("/api/v1/company"), adminToken, BASE_UPDATE)
                 .andExpect(status().isOk())
@@ -110,7 +113,8 @@ class CompanyApiIntegrationTest {
                 {"name":"Firma","address":null,"taxNumber":null,"taxOffice":null,"phone":null,"email":null,
                  "vatRate":20,"defaultDiscountPct":0,"currency":"TRY","quoteNote":null,"quoteValidityDays":15,
                  "sawKerfMm":25,"barTrimMm":10,"minOffcutMm":500,
-                 "glassSupplierName":null,"glassSupplierPhone":null,"glassSupplierEmail":null,"glassOrderNote":null}""";
+                 "glassSupplierName":null,"glassSupplierPhone":null,"glassSupplierEmail":null,"glassOrderNote":null,
+                 "pricingMode":"COST_PLUS","profitMarginPct":30,"laborPerM2":400,"installPerM2":250,"minBillableAreaM2":1.00}""";
         call(put("/api/v1/company"), token, badKerf).andExpect(status().isBadRequest());
 
         String ok = """
@@ -118,7 +122,8 @@ class CompanyApiIntegrationTest {
                  "vatRate":20,"defaultDiscountPct":0,"currency":"TRY","quoteNote":null,"quoteValidityDays":15,
                  "sawKerfMm":3.5,"barTrimMm":12,"minOffcutMm":800,
                  "glassSupplierName":"Cam A.Ş.","glassSupplierPhone":"0555","glassSupplierEmail":"cam@test.com",
-                 "glassOrderNote":"Isıcam çıtası gri"}""";
+                 "glassOrderNote":"Isıcam çıtası gri",
+                 "pricingMode":"COST_PLUS","profitMarginPct":30,"laborPerM2":400,"installPerM2":250,"minBillableAreaM2":1.00}""";
         call(put("/api/v1/company"), token, ok)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sawKerfMm").value(3.5))
