@@ -29,7 +29,8 @@ public record CompanyDto(
         BigDecimal laborPerM2,
         BigDecimal installPerM2,
         BigDecimal minBillableAreaM2,
-        BigDecimal surveyGapMm
+        BigDecimal surveyGapMm,
+        BigDecimal screenMinAreaM2
 ) {
     public static CompanyDto of(Company c) {
         return new CompanyDto(
@@ -57,7 +58,8 @@ public record CompanyDto(
                 c.getLaborPerM2(),
                 c.getInstallPerM2(),
                 c.getMinBillableAreaM2(),
-                c.getSurveyGapMm()
+                c.getSurveyGapMm(),
+                c.getScreenMinAreaM2()
         );
     }
 }

@@ -19,6 +19,9 @@ public class DesignDocumentValidator {
     public static final int MAX_COUPLE_FRAMES = 6;
     public static final Set<String> OPENINGS = Set.of("turnLeft", "turnRight", "tilt", "tiltTurnLeft", "tiltTurnRight");
     public static final Set<String> DOOR_OPENINGS = Set.of("turnLeft", "turnRight");
+    public static final Set<String> SCREENS = Set.of("plise", "hinged", "sliding");
+    public static final Set<String> SLIDE_MOVES = Set.of("left", "right", "fixed");
+    public static final Set<String> SLIDE_SYSTEMS = Set.of("standard", "liftSlide");
 
     public void validateOrThrow(Map<String, Object> doc) {
         List<Map<String, String>> errors = validate(doc);
@@ -94,14 +97,7 @@ public class DesignDocumentValidator {
             case "frame" -> validateFrame(c, m, path, depth, parentType, coupleDir, designW, designH);
             case "split" -> validateSplit(c, m, path, depth, designW, designH);
             case "sash" -> validateSash(c, m, path, depth, designW, designH);
-            case "slide" -> {
-                List<?> children = list(c, m.get("children"), path + ".children");
-                if (children == null) return;
-                if (children.size() != 2) c.err(path + ".children", "Sürme için tam 2 kanat olmalı.");
-                for (int i = 0; i < children.size(); i++) {
-                    node(c, children.get(i), path + ".children[" + i + "]", depth + 1, t, null, designW, designH);
-                }
-            }
+            case "slide" -> validateSlide(c, m, path, depth, designW, designH);
             case "glass", "panel" -> {
                 Object glass = m.get("glass");
                 if (glass != null && (!(glass instanceof String g) || g.length() > 64)) {
@@ -231,6 +227,54 @@ public class DesignDocumentValidator {
         }
     }
 
+    private void validateSlide(Ctx c, Map<?, ?> m, String path, int depth, Double designW, Double designH) {
+        if (m.containsKey("panels")) {
+            Object system = m.get("system");
+            String sys = system instanceof String s && SLIDE_SYSTEMS.contains(s) ? s : null;
+            if (sys == null) {
+                c.err(path + ".system", "standard veya liftSlide olmalı.");
+                sys = "standard";
+            }
+            List<?> panels = list(c, m.get("panels"), path + ".panels");
+            if (panels == null) return;
+            int maxPanels = "liftSlide".equals(sys) ? 4 : 6;
+            if (panels.size() < 2 || panels.size() > maxPanels) {
+                c.err(path + ".panels", "liftSlide".equals(sys)
+                        ? "Kaldır-sür için 2-4 panel olmalı."
+                        : "Sürme için 2-6 panel olmalı.");
+            }
+            int movable = 0;
+            for (int i = 0; i < panels.size(); i++) {
+                Object raw = panels.get(i);
+                String pp = path + ".panels[" + i + "]";
+                if (!(raw instanceof Map<?, ?> panel)) {
+                    c.err(pp, "Panel nesne olmalı.");
+                    continue;
+                }
+                Object move = panel.get("move");
+                if (!(move instanceof String mv) || !SLIDE_MOVES.contains(mv)) {
+                    c.err(pp + ".move", "left, right veya fixed olmalı.");
+                } else if (!"fixed".equals(mv)) {
+                    movable++;
+                }
+                validateScreen(c, panel.get("screen"), pp + ".screen");
+                Object child = panel.get("child");
+                if (child == null) c.err(pp + ".child", "Eksik.");
+                else node(c, child, pp + ".child", depth + 1, "slide", null, designW, designH);
+            }
+            if (!panels.isEmpty() && movable == 0) {
+                c.err(path + ".panels", "En az bir hareketli panel (move ≠ fixed) olmalı.");
+            }
+            return;
+        }
+        List<?> children = list(c, m.get("children"), path + ".children");
+        if (children == null) return;
+        if (children.size() != 2) c.err(path + ".children", "Sürme için tam 2 kanat olmalı.");
+        for (int i = 0; i < children.size(); i++) {
+            node(c, children.get(i), path + ".children[" + i + "]", depth + 1, "slide", null, designW, designH);
+        }
+    }
+
     private void validateSash(Ctx c, Map<?, ?> m, String path, int depth, Double designW, Double designH) {
         Object kind = m.get("kind");
         if (kind != null && !"window".equals(kind) && !"door".equals(kind)) {
@@ -250,9 +294,17 @@ public class DesignDocumentValidator {
         if (outward != null && !(outward instanceof Boolean)) {
             c.err(path + ".outward", "Boolean olmalı.");
         }
+        validateScreen(c, m.get("screen"), path + ".screen");
         Object child = m.get("child");
         if (child == null) c.err(path + ".child", "Eksik.");
         else node(c, child, path + ".child", depth + 1, "sash", null, designW, designH);
+    }
+
+    private static void validateScreen(Ctx c, Object screen, String path) {
+        if (screen == null) return;
+        if (!(screen instanceof String s) || !SCREENS.contains(s)) {
+            c.err(path, "plise, hinged veya sliding olmalı.");
+        }
     }
 
     private static boolean bool(Object v) {

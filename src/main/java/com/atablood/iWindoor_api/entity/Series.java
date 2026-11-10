@@ -86,6 +86,9 @@ public class Series {
     @Column(name = "max_slide_sash_width_mm", nullable = false)
     private Double maxSlideSashWidthMm = 2000.0;
 
+    @Column(name = "max_lift_slide_sash_width_mm", nullable = false)
+    private Double maxLiftSlideSashWidthMm = 3000.0;
+
     @Column(name = "max_fixed_glass_area_m2", nullable = false)
     private Double maxFixedGlassAreaM2 = 6.0;
 

@@ -90,6 +90,10 @@ public class Company {
     @Column(name = "survey_gap_mm", nullable = false, precision = 5, scale = 1)
     private BigDecimal surveyGapMm = new BigDecimal("10.0");
 
+    /** Sineklik için faturalanan asgari alan (m²). */
+    @Column(name = "screen_min_area_m2", nullable = false, precision = 5, scale = 2)
+    private BigDecimal screenMinAreaM2 = new BigDecimal("0.50");
+
     // Şirkete bağlı çalışanlar
     @OneToMany(mappedBy = "company", cascade = CascadeType.ALL)
     @JsonManagedReference

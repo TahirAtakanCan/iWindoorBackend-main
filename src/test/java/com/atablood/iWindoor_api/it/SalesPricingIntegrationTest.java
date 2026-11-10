@@ -63,7 +63,7 @@ class SalesPricingIntegrationTest {
              "sawKerfMm":4,"barTrimMm":10,"minOffcutMm":500,
              "glassSupplierName":null,"glassSupplierPhone":null,"glassSupplierEmail":null,"glassOrderNote":null,
              "pricingMode":"COST_PLUS","profitMarginPct":%s,"laborPerM2":400,"installPerM2":250,"minBillableAreaM2":1.00,
-             "surveyGapMm":10}""";
+             "surveyGapMm":10,"screenMinAreaM2":0.50}""";
 
     @Test
     void extrasMarginAndEmployeeCostSummary() throws Exception {

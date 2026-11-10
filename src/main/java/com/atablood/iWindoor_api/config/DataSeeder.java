@@ -89,6 +89,10 @@ public class DataSeeder implements CommandLineRunner {
         accessory("KAPI-KILIT-SET", "Kapı kilit takımı", AccessoryUnit.SET, 950);
         accessory("KAPI-KOLU", "Kapı kolu", AccessoryUnit.PIECE, 380);
         accessory("KAPI-MENTESE", "Kapı menteşesi", AccessoryUnit.PIECE, 140);
+        accessory("HS-SET", "Kaldır-sür takımı", AccessoryUnit.SET, 2400);
+        accessory("SINEKLIK-PLISE", "Pileli sineklik", AccessoryUnit.M2, 950);
+        accessory("SINEKLIK-MENTESELI", "Menteşeli sineklik", AccessoryUnit.M2, 700);
+        accessory("SINEKLIK-SURME", "Sürme sineklik", AccessoryUnit.M2, 600);
 
         color("white", "Beyaz", "#F4F5F2", "#F4F5F2", 0, 10);
         color("CREAM", "Krem", "#EFE6D2", "#EFE6D2", 10, 20);
@@ -141,6 +145,11 @@ public class DataSeeder implements CommandLineRunner {
         rule("DOOR_PASSIVE", "PASIF-KANAT-SET", "PER_SASH", 1, 10);
         rule("DOOR_PASSIVE", "KAPI-MENTESE", "PER_SASH", 3, 20);
         rule("DOOR_PASSIVE", "CONTA-EPDM", "PER_PERIMETER_METER", 1, 30);
+
+        rule("SLIDE_FIXED", "CONTA-EPDM", "PER_PERIMETER_METER", 1, 10);
+
+        rule("LIFT_SLIDE", "HS-SET", "PER_SASH", 1, 10);
+        rule("LIFT_SLIDE", "CONTA-EPDM", "PER_PERIMETER_METER", 1, 20);
     }
 
     private void ensureProfile(Series s, String code, String name, ProfileType type, double face, double price,

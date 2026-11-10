@@ -6,6 +6,7 @@ import com.atablood.iWindoor_api.entity.*;
 import com.atablood.iWindoor_api.exception.BadRequestException;
 import com.atablood.iWindoor_api.repository.AccessoryRepository;
 import com.atablood.iWindoor_api.repository.ColorRepository;
+import com.atablood.iWindoor_api.repository.CompanyRepository;
 import com.atablood.iWindoor_api.repository.GlassRepository;
 import com.atablood.iWindoor_api.repository.HardwareRuleRepository;
 import com.atablood.iWindoor_api.repository.ProfileRepository;
@@ -26,18 +27,26 @@ public class BomPricer {
 
     public static final int MAX_LINES = 2000;
     public static final String DUPLEX_ACCESSORY_CODE = "DUPLEX";
-    private static final Set<String> GROUPS = Set.of("PROFILE", "BEAD", "DUPLEX", "GLASS", "PANEL", "HARDWARE", "COLOR");
+    private static final Set<String> GROUPS = Set.of(
+            "PROFILE", "BEAD", "DUPLEX", "GLASS", "PANEL", "HARDWARE", "COLOR", "SCREEN");
     private static final Set<String> ROLES = Set.of(
             "FRAME", "SASH", "MULLION", "SLIDE_SASH", "ADAPTER", "EXTENSION", "DOOR_SASH", "THRESHOLD", "COUPLING");
     private static final Set<String> CUTS = Set.of("45/45", "90/90", "45/90");
     private static final Set<String> HARDWARE_KINDS = Set.of(
-            "TURN", "TILT", "TILT_TURN", "SLIDE", "PASSIVE", "DOOR", "DOOR_PASSIVE");
+            "TURN", "TILT", "TILT_TURN", "SLIDE", "PASSIVE", "DOOR", "DOOR_PASSIVE",
+            "SLIDE_FIXED", "LIFT_SLIDE");
+    private static final Set<String> SCREEN_KINDS = Set.of("PLISE", "HINGED", "SLIDING");
+    private static final Map<String, String> SCREEN_CODES = Map.of(
+            "PLISE", "SINEKLIK-PLISE",
+            "HINGED", "SINEKLIK-MENTESELI",
+            "SLIDING", "SINEKLIK-SURME");
 
     private final ProfileRepository profileRepository;
     private final GlassRepository glassRepository;
     private final AccessoryRepository accessoryRepository;
     private final HardwareRuleRepository hardwareRuleRepository;
     private final ColorRepository colorRepository;
+    private final CompanyRepository companyRepository;
 
     public void validate(List<Map<String, Object>> bom) {
         if (bom == null) return;
@@ -73,6 +82,13 @@ public class BomPricer {
                 case "HARDWARE" -> {
                     if (!(l.get("kind") instanceof String kind) || !HARDWARE_KINDS.contains(kind)) {
                         errors.add(err(p + ".kind", "Şunlardan biri olmalı: " + new TreeSet<>(HARDWARE_KINDS)));
+                    }
+                    if (!positive(l.get("w"), 12000)) errors.add(err(p + ".w", "0-12000 mm arası olmalı."));
+                    if (!positive(l.get("h"), 12000)) errors.add(err(p + ".h", "0-12000 mm arası olmalı."));
+                }
+                case "SCREEN" -> {
+                    if (!(l.get("kind") instanceof String kind) || !SCREEN_KINDS.contains(kind)) {
+                        errors.add(err(p + ".kind", "Şunlardan biri olmalı: " + new TreeSet<>(SCREEN_KINDS)));
                     }
                     if (!positive(l.get("w"), 12000)) errors.add(err(p + ".w", "0-12000 mm arası olmalı."));
                     if (!positive(l.get("h"), 12000)) errors.add(err(p + ".h", "0-12000 mm arası olmalı."));
@@ -144,6 +160,7 @@ public class BomPricer {
                             a == null ? BigDecimal.ZERO : a.getPrice());
                 }
                 case "HARDWARE" -> applyHardware(r, acc, warnings, l, qty);
+                case "SCREEN" -> applyScreen(r, acc, warnings, l, qty);
                 case "COLOR" -> {
                     if (colorCode == null) colorCode = (String) l.get("colorCode");
                 }
@@ -217,12 +234,26 @@ public class BomPricer {
         }
     }
 
+    private void applyScreen(Resolver r, Map<String, Acc> acc, Set<String> warnings, Map<String, Object> line, int lineQty) {
+        String kind = (String) line.get("kind");
+        String code = SCREEN_CODES.get(kind);
+        double area = Math.max(num(line.get("w")) * num(line.get("h")) / 1_000_000.0, r.screenMinAreaM2()) * lineQty;
+        Accessory a = r.accessory(code);
+        if (a == null) {
+            warnings.add("Aksesuar bulunamadı: " + code);
+            add(acc, "ACCESSORY", code, code, area, "m²", BigDecimal.ZERO);
+        } else {
+            add(acc, "ACCESSORY", a.getCode(), a.getName(), area, "m²", a.getPrice());
+        }
+    }
+
     private static String unitLabel(AccessoryUnit unit) {
         if (unit == null) return "adet";
         return switch (unit) {
             case PIECE -> "adet";
             case SET -> "takım";
             case METER -> "m";
+            case M2 -> "m²";
         };
     }
 
@@ -269,6 +300,7 @@ public class BomPricer {
         private final Long seriesId;
         private final Set<String> warnings;
         private final List<Profile> seriesProfiles;
+        private final double screenMinAreaM2;
         private final Map<String, Optional<Glass>> glasses = new HashMap<>();
         private final Map<String, Optional<Accessory>> accessories = new HashMap<>();
         private final Map<String, Optional<Color>> colors = new HashMap<>();
@@ -280,6 +312,14 @@ public class BomPricer {
             this.warnings = warnings;
             this.seriesProfiles = series == null ? List.of()
                     : profileRepository.findBySeries_IdOrderByIdAsc(series.getId());
+            Company company = companyRepository.findById(companyId).orElse(null);
+            this.screenMinAreaM2 = company == null || company.getScreenMinAreaM2() == null
+                    ? 0.50
+                    : company.getScreenMinAreaM2().doubleValue();
+        }
+
+        double screenMinAreaM2() {
+            return screenMinAreaM2;
         }
 
         Profile profile(ProfileType type) {

@@ -32,7 +32,8 @@ import java.util.function.Consumer;
 public class CatalogServiceImpl implements CatalogService {
 
     private static final Set<String> HARDWARE_KINDS = Set.of(
-            "TURN", "TILT", "TILT_TURN", "SLIDE", "PASSIVE", "DOOR", "DOOR_PASSIVE");
+            "TURN", "TILT", "TILT_TURN", "SLIDE", "PASSIVE", "DOOR", "DOOR_PASSIVE",
+            "SLIDE_FIXED", "LIFT_SLIDE");
     private static final Set<String> QTY_TYPES = Set.of("PER_SASH", "PER_PERIMETER_METER");
     private static final Set<String> ADJUST_TARGETS = Set.of("PROFILE", "GLASS", "ACCESSORY", "ALL");
 
@@ -127,6 +128,7 @@ public class CatalogServiceImpl implements CatalogService {
         set(g.maxSashWidth(), s::setMaxSashWidthMm);
         set(g.maxSashHeight(), s::setMaxSashHeightMm);
         set(g.maxSlideSashWidth(), s::setMaxSlideSashWidthMm);
+        set(g.maxLiftSlideSashWidth(), s::setMaxLiftSlideSashWidthMm);
         set(g.maxFixedGlassArea(), s::setMaxFixedGlassAreaM2);
         set(g.adapterFace(), s::setAdapterFaceMm);
         set(g.doorSashFace(), s::setDoorSashFaceMm);

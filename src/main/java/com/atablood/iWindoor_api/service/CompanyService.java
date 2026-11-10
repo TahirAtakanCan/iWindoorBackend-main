@@ -56,6 +56,7 @@ public class CompanyService {
         c.setInstallPerM2(money(req.installPerM2()));
         c.setMinBillableAreaM2(money(req.minBillableAreaM2()));
         c.setSurveyGapMm(mm1(req.surveyGapMm()));
+        c.setScreenMinAreaM2(money(req.screenMinAreaM2()));
         Company saved = companyRepository.save(c);
         if (pricingChanged) {
             salesPricingService.recalculateCompanySales(saved.getId());

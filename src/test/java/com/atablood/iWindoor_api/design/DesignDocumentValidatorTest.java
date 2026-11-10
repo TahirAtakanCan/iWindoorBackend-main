@@ -137,6 +137,62 @@ class DesignDocumentValidatorTest {
     }
 
     @Test
+    void acceptsNewSlidePanelsAndScreen() {
+        Map<String, Object> panels = new LinkedHashMap<>(Map.of(
+                "id", "s1", "type", "slide", "system", "standard",
+                "panels", List.of(
+                        Map.of("move", "right", "child", leaf("p1")),
+                        Map.of("move", "fixed", "child", leaf("p2")),
+                        Map.of("move", "left", "screen", "plise", "child", leaf("p3")))));
+        Map<String, Object> doc = sample();
+        doc.put("root", panels);
+        assertThat(validator.validate(doc)).isEmpty();
+
+        Map<String, Object> sash = new LinkedHashMap<>(Map.of(
+                "id", "sa", "type", "sash", "open", "turnLeft", "screen", "plise", "child", leaf("sg")));
+        doc.put("root", sash);
+        assertThat(validator.validate(doc)).isEmpty();
+
+        Map<String, Object> oldSlide = new LinkedHashMap<>(Map.of(
+                "id", "old", "type", "slide", "children", List.of(leaf("a"), leaf("b"))));
+        doc.put("root", oldSlide);
+        assertThat(validator.validate(doc)).isEmpty();
+    }
+
+    @Test
+    void rejectsInvalidSlidePanelsAndScreen() {
+        Map<String, Object> doc = sample();
+
+        doc.put("root", new LinkedHashMap<>(Map.of(
+                "id", "allFixed", "type", "slide", "system", "standard",
+                "panels", List.of(
+                        Map.of("move", "fixed", "child", leaf("f1")),
+                        Map.of("move", "fixed", "child", leaf("f2"))))));
+        assertThat(validator.validate(doc)).isNotEmpty();
+
+        List<Map<String, Object>> seven = new ArrayList<>();
+        for (int i = 0; i < 7; i++) {
+            seven.add(Map.of("move", i == 0 ? "left" : "fixed", "child", leaf("n" + i)));
+        }
+        doc.put("root", new LinkedHashMap<>(Map.of(
+                "id", "seven", "type", "slide", "system", "standard", "panels", seven)));
+        assertThat(validator.validate(doc)).isNotEmpty();
+
+        List<Map<String, Object>> fiveLift = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            fiveLift.add(Map.of("move", i == 0 ? "left" : "fixed", "child", leaf("l" + i)));
+        }
+        doc.put("root", new LinkedHashMap<>(Map.of(
+                "id", "lift5", "type", "slide", "system", "liftSlide", "panels", fiveLift)));
+        assertThat(validator.validate(doc)).isNotEmpty();
+
+        Map<String, Object> badScreen = new LinkedHashMap<>(Map.of(
+                "id", "bs", "type", "sash", "open", "turnLeft", "screen", "abc", "child", leaf("bg")));
+        doc.put("root", badScreen);
+        assertThat(validator.validate(doc).stream().map(e -> e.get("path"))).contains("$.root.screen");
+    }
+
+    @Test
     void acceptsCoupleRootAndRejectsInvalidCouple() {
         Map<String, Object> frame1 = new LinkedHashMap<>(Map.of(
                 "id", "f1", "type", "frame", "height", 1400, "child", leaf("g1")));

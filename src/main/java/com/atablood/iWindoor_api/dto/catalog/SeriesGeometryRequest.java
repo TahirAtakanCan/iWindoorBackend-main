@@ -23,6 +23,7 @@ public record SeriesGeometryRequest(
         @Positive @DecimalMax("10000") Double maxSashWidth,
         @Positive @DecimalMax("10000") Double maxSashHeight,
         @Positive @DecimalMax("10000") Double maxSlideSashWidth,
+        @Positive @DecimalMax("10000") Double maxLiftSlideSashWidth,
         @Positive @DecimalMax("100") Double maxFixedGlassArea,
         @PositiveOrZero @DecimalMax("300") Double adapterFace,
         @PositiveOrZero @DecimalMax("300") Double doorSashFace,

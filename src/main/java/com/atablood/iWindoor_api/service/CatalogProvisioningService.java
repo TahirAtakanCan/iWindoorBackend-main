@@ -59,6 +59,7 @@ public class CatalogProvisioningService {
                 s.setMaxSashWidthMm(t.getMaxSashWidthMm());
                 s.setMaxSashHeightMm(t.getMaxSashHeightMm());
                 s.setMaxSlideSashWidthMm(t.getMaxSlideSashWidthMm());
+                s.setMaxLiftSlideSashWidthMm(t.getMaxLiftSlideSashWidthMm());
                 s.setMaxFixedGlassAreaM2(t.getMaxFixedGlassAreaM2());
                 s.setAdapterFaceMm(t.getAdapterFaceMm());
                 s.setDoorSashFaceMm(t.getDoorSashFaceMm());

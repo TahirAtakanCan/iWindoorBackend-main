@@ -6,6 +6,7 @@ import com.atablood.iWindoor_api.entity.*;
 import com.atablood.iWindoor_api.exception.BadRequestException;
 import com.atablood.iWindoor_api.repository.AccessoryRepository;
 import com.atablood.iWindoor_api.repository.ColorRepository;
+import com.atablood.iWindoor_api.repository.CompanyRepository;
 import com.atablood.iWindoor_api.repository.GlassRepository;
 import com.atablood.iWindoor_api.repository.HardwareRuleRepository;
 import com.atablood.iWindoor_api.repository.ProfileRepository;
@@ -29,6 +30,7 @@ class BomPricerTest {
     private AccessoryRepository accessories;
     private HardwareRuleRepository hardwareRules;
     private ColorRepository colors;
+    private CompanyRepository companies;
     private BomPricer pricer;
     private Series series;
 
@@ -71,9 +73,14 @@ class BomPricerTest {
         accessories = mock(AccessoryRepository.class);
         hardwareRules = mock(HardwareRuleRepository.class);
         colors = mock(ColorRepository.class);
-        pricer = new BomPricer(profiles, glasses, accessories, hardwareRules, colors);
+        companies = mock(CompanyRepository.class);
+        pricer = new BomPricer(profiles, glasses, accessories, hardwareRules, colors, companies);
         series = new Series();
         series.setId(1L);
+        Company company = new Company();
+        company.setId(COMPANY);
+        company.setScreenMinAreaM2(new BigDecimal("0.50"));
+        when(companies.findById(COMPANY)).thenReturn(Optional.of(company));
         when(colors.findFirstByCompanyIdAndCode(anyLong(), anyString())).thenReturn(Optional.empty());
         when(profiles.findBySeries_IdOrderByIdAsc(1L)).thenReturn(List.of(
                 profile(1, ProfileType.FRAME, "K70-62", 180, null, null, true),
@@ -310,5 +317,64 @@ class BomPricerTest {
         assertThat(p.warnings()).contains("Renk bulunamadı: YOK");
         QuoteLine colorLine = p.lines().stream().filter(l -> "COLOR".equals(l.group())).findFirst().orElseThrow();
         assertThat(colorLine.total()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void screenPliseUsesActualArea() {
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "SINEKLIK-PLISE"))
+                .thenReturn(Optional.of(accessory("SINEKLIK-PLISE", "Pileli sineklik", AccessoryUnit.M2, 950)));
+        Map<String, Object> screen = new LinkedHashMap<>(Map.of(
+                "group", "SCREEN", "kind", "PLISE", "w", 576, "h", 1176, "qty", 1));
+        PricedBom p = pricer.price(COMPANY, series, List.of(screen));
+        QuoteLine line = p.lines().get(0);
+        assertThat(line.group()).isEqualTo("ACCESSORY");
+        assertThat(line.code()).isEqualTo("SINEKLIK-PLISE");
+        assertThat(line.unit()).isEqualTo("m²");
+        assertThat(line.quantity()).isEqualTo(0.677);
+        assertThat(line.total()).isEqualByComparingTo("643.51");
+    }
+
+    @Test
+    void screenSlidingAppliesMinArea() {
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "SINEKLIK-SURME"))
+                .thenReturn(Optional.of(accessory("SINEKLIK-SURME", "Sürme sineklik", AccessoryUnit.M2, 600)));
+        Map<String, Object> screen = new LinkedHashMap<>(Map.of(
+                "group", "SCREEN", "kind", "SLIDING", "w", 400, "h", 500, "qty", 1));
+        PricedBom p = pricer.price(COMPANY, series, List.of(screen));
+        QuoteLine line = p.lines().get(0);
+        assertThat(line.code()).isEqualTo("SINEKLIK-SURME");
+        assertThat(line.quantity()).isEqualTo(0.5);
+        assertThat(line.total()).isEqualByComparingTo("300.00");
+    }
+
+    @Test
+    void liftSlideAndSlideFixedHardware() {
+        when(hardwareRules.findByCompanyIdAndSeriesIdIsNullAndKindOrderBySortOrderAscIdAsc(COMPANY, "LIFT_SLIDE"))
+                .thenReturn(List.of(
+                        rule("LIFT_SLIDE", "HS-SET", "PER_SASH", 1, 10),
+                        rule("LIFT_SLIDE", "CONTA-EPDM", "PER_PERIMETER_METER", 1, 20)));
+        when(hardwareRules.findByCompanyIdAndSeriesIdIsNullAndKindOrderBySortOrderAscIdAsc(COMPANY, "SLIDE_FIXED"))
+                .thenReturn(List.of(rule("SLIDE_FIXED", "CONTA-EPDM", "PER_PERIMETER_METER", 1, 10)));
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "HS-SET"))
+                .thenReturn(Optional.of(accessory("HS-SET", "Kaldır-sür takımı", AccessoryUnit.SET, 2400)));
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "CONTA-EPDM"))
+                .thenReturn(Optional.of(accessory("CONTA-EPDM", "EPDM conta", AccessoryUnit.METER, 12)));
+
+        Map<String, Object> lift = new LinkedHashMap<>(Map.of(
+                "group", "HARDWARE", "kind", "LIFT_SLIDE", "w", 1000, "h", 2000, "qty", 1));
+        PricedBom liftBom = pricer.price(COMPANY, series, List.of(lift));
+        Map<String, QuoteLine> liftBy = new HashMap<>();
+        for (QuoteLine l : liftBom.lines()) liftBy.put(l.code(), l);
+        assertThat(liftBy.keySet()).containsExactlyInAnyOrder("HS-SET", "CONTA-EPDM");
+        assertThat(liftBy.get("HS-SET").quantity()).isEqualTo(1.0);
+        assertThat(liftBy.get("HS-SET").unit()).isEqualTo("takım");
+        assertThat(liftBy.get("CONTA-EPDM").quantity()).isEqualTo(6.0);
+
+        Map<String, Object> fixed = new LinkedHashMap<>(Map.of(
+                "group", "HARDWARE", "kind", "SLIDE_FIXED", "w", 1000, "h", 2000, "qty", 1));
+        PricedBom fixedBom = pricer.price(COMPANY, series, List.of(fixed));
+        assertThat(fixedBom.lines()).hasSize(1);
+        assertThat(fixedBom.lines().get(0).code()).isEqualTo("CONTA-EPDM");
+        assertThat(fixedBom.lines().get(0).quantity()).isEqualTo(6.0);
     }
 }
