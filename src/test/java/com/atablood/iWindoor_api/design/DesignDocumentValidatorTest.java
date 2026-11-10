@@ -137,6 +137,29 @@ class DesignDocumentValidatorTest {
     }
 
     @Test
+    void acceptsAndRejectsShutterAndExtras() {
+        Map<String, Object> ok = sample();
+        ok.put("schemaVersion", 2);
+        ok.put("shutter", Map.of("type", "mono", "slat", "aluminum", "drive", "manual"));
+        ok.put("extras", Map.of(
+                "sillOuter", true, "sillInner", false, "trim", "three",
+                "extension", Map.of("top", 30, "left", 0, "right", 20, "bottom", 0)));
+        assertThat(validator.validate(ok)).isEmpty();
+
+        Map<String, Object> badSlat = sample();
+        badSlat.put("schemaVersion", 2);
+        badSlat.put("shutter", Map.of("type", "mono", "slat", "wood", "drive", "manual"));
+        assertThat(validator.validate(badSlat).stream().map(e -> e.get("path")))
+                .contains("$.shutter.slat");
+
+        Map<String, Object> badExt = sample();
+        badExt.put("schemaVersion", 2);
+        badExt.put("extras", Map.of("extension", Map.of("top", 300)));
+        assertThat(validator.validate(badExt).stream().map(e -> e.get("path")))
+                .contains("$.extras.extension.top");
+    }
+
+    @Test
     void acceptsAndRejectsShapedWindows() {
         Map<String, Object> archOk = sample();
         archOk.put("schemaVersion", 2);

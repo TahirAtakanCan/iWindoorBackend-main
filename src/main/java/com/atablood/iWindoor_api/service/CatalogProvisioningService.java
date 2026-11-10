@@ -71,6 +71,9 @@ public class CatalogProvisioningService {
                 s.setMaxDoorSashHeightMm(t.getMaxDoorSashHeightMm());
                 s.setCouplingFaceMm(t.getCouplingFaceMm());
                 s.setCouplingGapMm(t.getCouplingGapMm());
+                s.setShutterBoxHeightMm(t.getShutterBoxHeightMm());
+                s.setSillOverhangMm(t.getSillOverhangMm());
+                s.setTrimWidthMm(t.getTrimWidthMm());
                 s.setCompanyId(companyId);
                 copies.put(t.getId(), seriesRepository.save(s));
             }

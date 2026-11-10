@@ -409,6 +409,74 @@ class BomPricerTest {
     }
 
     @Test
+    void shutterAndExtrasPricing() {
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "PANJUR-LAMEL-AL"))
+                .thenReturn(Optional.of(accessory("PANJUR-LAMEL-AL", "Alüminyum panjur lameli", AccessoryUnit.M2, 1100)));
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "PANJUR-KUTU-MONO"))
+                .thenReturn(Optional.of(accessory("PANJUR-KUTU-MONO", "Monoblok panjur kutusu", AccessoryUnit.METER, 650)));
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "PANJUR-RAY"))
+                .thenReturn(Optional.of(accessory("PANJUR-RAY", "Panjur yan rayı", AccessoryUnit.METER, 120)));
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "PANJUR-KAYIS"))
+                .thenReturn(Optional.of(accessory("PANJUR-KAYIS", "Panjur kayış/makara takımı", AccessoryUnit.SET, 450)));
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "PANJUR-MOTOR"))
+                .thenReturn(Optional.of(accessory("PANJUR-MOTOR", "Panjur motoru", AccessoryUnit.PIECE, 2200)));
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "DENIZLIK-DIS"))
+                .thenReturn(Optional.of(accessory("DENIZLIK-DIS", "Dış denizlik (alüminyum)", AccessoryUnit.METER, 280)));
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "PERVAZ"))
+                .thenReturn(Optional.of(accessory("PERVAZ", "İç pervaz", AccessoryUnit.METER, 60)));
+
+        Company company = new Company();
+        company.setId(COMPANY);
+        company.setScreenMinAreaM2(new BigDecimal("0.50"));
+        company.setShutterMinAreaM2(new BigDecimal("1.00"));
+        when(companies.findById(COMPANY)).thenReturn(Optional.of(company));
+        series.setShutterBoxHeightMm(180.0);
+
+        Map<String, Object> shutter = new LinkedHashMap<>(Map.of(
+                "group", "SHUTTER", "kind", "MONO", "slat", "ALUMINUM", "drive", "MANUAL",
+                "w", 1400, "h", 1580, "qty", 1));
+        PricedBom manual = pricer.price(COMPANY, series, List.of(shutter));
+        Map<String, QuoteLine> by = new HashMap<>();
+        for (QuoteLine l : manual.lines()) by.put(l.code(), l);
+        assertThat(by.get("PANJUR-LAMEL-AL").quantity()).isEqualTo(2.212);
+        assertThat(by.get("PANJUR-LAMEL-AL").total()).isEqualByComparingTo("2433.20");
+        assertThat(by.get("PANJUR-KUTU-MONO").quantity()).isEqualTo(1.4);
+        assertThat(by.get("PANJUR-KUTU-MONO").total()).isEqualByComparingTo("910.00");
+        assertThat(by.get("PANJUR-RAY").quantity()).isEqualTo(2.8);
+        assertThat(by.get("PANJUR-RAY").total()).isEqualByComparingTo("336.00");
+        assertThat(by.get("PANJUR-KAYIS").total()).isEqualByComparingTo("450.00");
+
+        shutter.put("drive", "MOTOR");
+        PricedBom motor = pricer.price(COMPANY, series, List.of(shutter));
+        Map<String, QuoteLine> byMotor = new HashMap<>();
+        for (QuoteLine l : motor.lines()) byMotor.put(l.code(), l);
+        assertThat(byMotor).containsKey("PANJUR-MOTOR");
+        assertThat(byMotor).doesNotContainKey("PANJUR-KAYIS");
+        assertThat(byMotor.get("PANJUR-MOTOR").total()).isEqualByComparingTo("2200.00");
+
+        Map<String, Object> small = new LinkedHashMap<>(Map.of(
+                "group", "SHUTTER", "kind", "MONO", "slat", "ALUMINUM", "drive", "MANUAL",
+                "w", 600, "h", 700, "qty", 1));
+        PricedBom minArea = pricer.price(COMPANY, series, List.of(small));
+        QuoteLine lamel = minArea.lines().stream().filter(l -> "PANJUR-LAMEL-AL".equals(l.code())).findFirst().orElseThrow();
+        assertThat(lamel.quantity()).isEqualTo(1.0);
+
+        Map<String, Object> sill = new LinkedHashMap<>(Map.of(
+                "group", "EXTRA", "kind", "SILL_OUTER", "length", 1460, "cut", "90/90", "qty", 1));
+        PricedBom sillBom = pricer.price(COMPANY, series, List.of(sill));
+        assertThat(sillBom.lines().get(0).code()).isEqualTo("DENIZLIK-DIS");
+        assertThat(sillBom.lines().get(0).total()).isEqualByComparingTo("408.80");
+
+        List<Map<String, Object>> trimBom = List.of(
+                new LinkedHashMap<>(Map.of("group", "EXTRA", "kind", "TRIM", "length", 1540, "qty", 1)),
+                new LinkedHashMap<>(Map.of("group", "EXTRA", "kind", "TRIM", "length", 1470, "qty", 2)));
+        PricedBom trim = pricer.price(COMPANY, series, trimBom);
+        assertThat(trim.lines().get(0).code()).isEqualTo("PERVAZ");
+        assertThat(trim.lines().get(0).quantity()).isEqualTo(4.48);
+        assertThat(trim.lines().get(0).total()).isEqualByComparingTo("268.80");
+    }
+
+    @Test
     void acceptsAngledCutAndRejectsInvalidCut() {
         Map<String, Object> ok = bar("PROFILE", "FRAME", 1000, 1);
         ok.put("cut", "45/31.7");

@@ -123,6 +123,15 @@ public class Series {
     @Column(name = "coupling_gap_mm", nullable = false)
     private Double couplingGapMm = 0.0;
 
+    @Column(name = "shutter_box_height_mm", nullable = false)
+    private Double shutterBoxHeightMm = 180.0;
+
+    @Column(name = "sill_overhang_mm", nullable = false)
+    private Double sillOverhangMm = 30.0;
+
+    @Column(name = "trim_width_mm", nullable = false)
+    private Double trimWidthMm = 70.0;
+
     /** PER_M2 modunda kullanılan satış birim fiyatı (₺/m²); null ise COST_PLUS'a düşülür. */
     @Column(name = "sale_price_per_m2", precision = 12, scale = 2)
     private java.math.BigDecimal salePricePerM2;

@@ -31,7 +31,7 @@ public class BomPricer {
     public static final String BEND_ACCESSORY_CODE = "BUKUM";
     public static final String SHAPED_GLASS_ACCESSORY_CODE = "SEKILLI-CAM";
     private static final Set<String> GROUPS = Set.of(
-            "PROFILE", "BEAD", "DUPLEX", "GLASS", "PANEL", "HARDWARE", "COLOR", "SCREEN");
+            "PROFILE", "BEAD", "DUPLEX", "GLASS", "PANEL", "HARDWARE", "COLOR", "SCREEN", "SHUTTER", "EXTRA");
     private static final Set<String> ROLES = Set.of(
             "FRAME", "SASH", "MULLION", "SLIDE_SASH", "ADAPTER", "EXTENSION", "DOOR_SASH", "THRESHOLD", "COUPLING");
     private static final Pattern CUT_PATTERN = Pattern.compile("^\\d{1,3}(\\.\\d)?/\\d{1,3}(\\.\\d)?$");
@@ -40,10 +40,18 @@ public class BomPricer {
             "SLIDE_FIXED", "LIFT_SLIDE");
     private static final Set<String> SCREEN_KINDS = Set.of("PLISE", "HINGED", "SLIDING");
     private static final Set<String> GLASS_SHAPES = Set.of("arch", "segmentArch", "trapezoid", "triangle");
+    private static final Set<String> SHUTTER_KINDS = Set.of("MONO", "EXTERNAL");
+    private static final Set<String> SHUTTER_SLATS = Set.of("ALUMINUM", "PVC");
+    private static final Set<String> SHUTTER_DRIVES = Set.of("MANUAL", "MOTOR");
+    private static final Set<String> EXTRA_KINDS = Set.of("SILL_OUTER", "SILL_INNER", "TRIM");
     private static final Map<String, String> SCREEN_CODES = Map.of(
             "PLISE", "SINEKLIK-PLISE",
             "HINGED", "SINEKLIK-MENTESELI",
             "SLIDING", "SINEKLIK-SURME");
+    private static final Map<String, String> EXTRA_CODES = Map.of(
+            "SILL_OUTER", "DENIZLIK-DIS",
+            "SILL_INNER", "DENIZLIK-IC",
+            "TRIM", "PERVAZ");
 
     private final ProfileRepository profileRepository;
     private final GlassRepository glassRepository;
@@ -105,6 +113,29 @@ public class BomPricer {
                     }
                     if (!positive(l.get("w"), 12000)) errors.add(err(p + ".w", "0-12000 mm arası olmalı."));
                     if (!positive(l.get("h"), 12000)) errors.add(err(p + ".h", "0-12000 mm arası olmalı."));
+                }
+                case "SHUTTER" -> {
+                    if (!(l.get("kind") instanceof String kind) || !SHUTTER_KINDS.contains(kind)) {
+                        errors.add(err(p + ".kind", "Şunlardan biri olmalı: " + new TreeSet<>(SHUTTER_KINDS)));
+                    }
+                    if (!(l.get("slat") instanceof String slat) || !SHUTTER_SLATS.contains(slat)) {
+                        errors.add(err(p + ".slat", "Şunlardan biri olmalı: " + new TreeSet<>(SHUTTER_SLATS)));
+                    }
+                    if (!(l.get("drive") instanceof String drive) || !SHUTTER_DRIVES.contains(drive)) {
+                        errors.add(err(p + ".drive", "Şunlardan biri olmalı: " + new TreeSet<>(SHUTTER_DRIVES)));
+                    }
+                    if (!positive(l.get("w"), 12000)) errors.add(err(p + ".w", "0-12000 mm arası olmalı."));
+                    if (!positive(l.get("h"), 12000)) errors.add(err(p + ".h", "0-12000 mm arası olmalı."));
+                }
+                case "EXTRA" -> {
+                    if (!(l.get("kind") instanceof String kind) || !EXTRA_KINDS.contains(kind)) {
+                        errors.add(err(p + ".kind", "Şunlardan biri olmalı: " + new TreeSet<>(EXTRA_KINDS)));
+                    }
+                    if (!positive(l.get("length"), 20000)) errors.add(err(p + ".length", "0-20000 mm arası olmalı."));
+                    Object cut = l.get("cut");
+                    if (cut != null && (!(cut instanceof String cs) || !CUT_PATTERN.matcher(cs).matches())) {
+                        errors.add(err(p + ".cut", "Biçim a/b olmalı (örn. 45/45, 90/90)."));
+                    }
                 }
                 case "COLOR" -> {
                     if (!(l.get("colorCode") instanceof String cc) || cc.isBlank()) {
@@ -181,6 +212,8 @@ public class BomPricer {
                 }
                 case "HARDWARE" -> applyHardware(r, acc, warnings, l, qty);
                 case "SCREEN" -> applyScreen(r, acc, warnings, l, qty);
+                case "SHUTTER" -> applyShutter(r, acc, warnings, l, qty);
+                case "EXTRA" -> applyExtra(r, acc, warnings, l, qty);
                 case "COLOR" -> {
                     if (colorCode == null) colorCode = (String) l.get("colorCode");
                 }
@@ -278,12 +311,48 @@ public class BomPricer {
         String kind = (String) line.get("kind");
         String code = SCREEN_CODES.get(kind);
         double area = Math.max(num(line.get("w")) * num(line.get("h")) / 1_000_000.0, r.screenMinAreaM2()) * lineQty;
+        addAccessoryOrWarn(r, acc, warnings, code, area, "m²");
+    }
+
+    private void applyShutter(Resolver r, Map<String, Acc> acc, Set<String> warnings, Map<String, Object> line, int lineQty) {
+        String kind = (String) line.get("kind");
+        String slat = (String) line.get("slat");
+        String drive = (String) line.get("drive");
+        double w = num(line.get("w"));
+        double h = num(line.get("h"));
+        double boxH = r.shutterBoxHeightMm();
+
+        String lamelCode = "ALUMINUM".equals(slat) ? "PANJUR-LAMEL-AL" : "PANJUR-LAMEL-PVC";
+        double area = Math.max(w * h / 1_000_000.0, r.shutterMinAreaM2()) * lineQty;
+        addAccessoryOrWarn(r, acc, warnings, lamelCode, area, "m²");
+
+        String boxCode = "MONO".equals(kind) ? "PANJUR-KUTU-MONO" : "PANJUR-KUTU-DIS";
+        addAccessoryOrWarn(r, acc, warnings, boxCode, w / 1000.0 * lineQty, "m");
+
+        double rail = 2.0 * Math.max(0, h - boxH) / 1000.0 * lineQty;
+        addAccessoryOrWarn(r, acc, warnings, "PANJUR-RAY", rail, "m");
+
+        if ("MOTOR".equals(drive)) {
+            addAccessoryOrWarn(r, acc, warnings, "PANJUR-MOTOR", lineQty, "adet");
+        } else {
+            addAccessoryOrWarn(r, acc, warnings, "PANJUR-KAYIS", lineQty, "takım");
+        }
+    }
+
+    private void applyExtra(Resolver r, Map<String, Acc> acc, Set<String> warnings, Map<String, Object> line, int lineQty) {
+        String code = EXTRA_CODES.get((String) line.get("kind"));
+        double meters = num(line.get("length")) / 1000.0 * lineQty;
+        addAccessoryOrWarn(r, acc, warnings, code, meters, "m");
+    }
+
+    private void addAccessoryOrWarn(Resolver r, Map<String, Acc> acc, Set<String> warnings,
+                                    String code, double quantity, String fallbackUnit) {
         Accessory a = r.accessory(code);
         if (a == null) {
             warnings.add("Aksesuar bulunamadı: " + code);
-            add(acc, "ACCESSORY", code, code, area, "m²", BigDecimal.ZERO);
+            add(acc, "ACCESSORY", code, code, quantity, fallbackUnit, BigDecimal.ZERO);
         } else {
-            add(acc, "ACCESSORY", a.getCode(), a.getName(), area, "m²", a.getPrice());
+            add(acc, "ACCESSORY", a.getCode(), a.getName(), quantity, unitLabel(a.getUnit()), a.getPrice());
         }
     }
 
@@ -341,6 +410,8 @@ public class BomPricer {
         private final Set<String> warnings;
         private final List<Profile> seriesProfiles;
         private final double screenMinAreaM2;
+        private final double shutterMinAreaM2;
+        private final double shutterBoxHeightMm;
         private final Map<String, Optional<Glass>> glasses = new HashMap<>();
         private final Map<String, Optional<Accessory>> accessories = new HashMap<>();
         private final Map<String, Optional<Color>> colors = new HashMap<>();
@@ -356,10 +427,24 @@ public class BomPricer {
             this.screenMinAreaM2 = company == null || company.getScreenMinAreaM2() == null
                     ? 0.50
                     : company.getScreenMinAreaM2().doubleValue();
+            this.shutterMinAreaM2 = company == null || company.getShutterMinAreaM2() == null
+                    ? 1.00
+                    : company.getShutterMinAreaM2().doubleValue();
+            this.shutterBoxHeightMm = series == null || series.getShutterBoxHeightMm() == null
+                    ? 180.0
+                    : series.getShutterBoxHeightMm();
         }
 
         double screenMinAreaM2() {
             return screenMinAreaM2;
+        }
+
+        double shutterMinAreaM2() {
+            return shutterMinAreaM2;
+        }
+
+        double shutterBoxHeightMm() {
+            return shutterBoxHeightMm;
         }
 
         Profile profile(ProfileType type) {

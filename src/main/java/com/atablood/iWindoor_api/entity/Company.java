@@ -94,6 +94,10 @@ public class Company {
     @Column(name = "screen_min_area_m2", nullable = false, precision = 5, scale = 2)
     private BigDecimal screenMinAreaM2 = new BigDecimal("0.50");
 
+    /** Panjur için faturalanan asgari alan (m²). */
+    @Column(name = "shutter_min_area_m2", nullable = false, precision = 5, scale = 2)
+    private BigDecimal shutterMinAreaM2 = new BigDecimal("1.00");
+
     // Şirkete bağlı çalışanlar
     @OneToMany(mappedBy = "company", cascade = CascadeType.ALL)
     @JsonManagedReference

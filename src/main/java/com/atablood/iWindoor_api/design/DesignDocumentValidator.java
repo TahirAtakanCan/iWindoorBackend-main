@@ -24,6 +24,10 @@ public class DesignDocumentValidator {
     public static final Set<String> SLIDE_SYSTEMS = Set.of("standard", "liftSlide");
     public static final Set<String> SHAPE_TYPES = Set.of("rect", "arch", "segmentArch", "trapezoid", "triangle");
     public static final Set<String> TRIANGLE_APEX = Set.of("center", "left", "right");
+    public static final Set<String> SHUTTER_TYPES = Set.of("mono", "external");
+    public static final Set<String> SHUTTER_SLATS = Set.of("aluminum", "pvc");
+    public static final Set<String> SHUTTER_DRIVES = Set.of("manual", "motor");
+    public static final Set<String> TRIM_OPTIONS = Set.of("none", "three", "four");
 
     public void validateOrThrow(Map<String, Object> doc) {
         List<Map<String, String>> errors = validate(doc);
@@ -58,6 +62,11 @@ public class DesignDocumentValidator {
         if (bottom != null && !"frame".equals(bottom) && !"threshold".equals(bottom)) {
             c.err("$.bottom", "frame veya threshold olmalı.");
         }
+        if (doc.containsKey("shutter") || doc.containsKey("extras")) {
+            requireSchema2ForShape(c);
+        }
+        validateShutter(c, doc.get("shutter"));
+        validateExtras(c, doc.get("extras"));
         Object root = doc.get("root");
         if (!(root instanceof Map<?, ?> rm)) {
             c.err("$.root", "Kök düğüm eksik.");
@@ -76,6 +85,59 @@ public class DesignDocumentValidator {
             node(c, root, "$.root", 1, null, null, designW, designH);
         }
         return c.errors;
+    }
+
+    private void validateShutter(Ctx c, Object shutter) {
+        if (shutter == null) return;
+        if (!(shutter instanceof Map<?, ?> m)) {
+            c.err("$.shutter", "Nesne olmalı.");
+            return;
+        }
+        Object type = m.get("type");
+        if (!(type instanceof String t) || !SHUTTER_TYPES.contains(t)) {
+            c.err("$.shutter.type", "mono veya external olmalı.");
+        }
+        Object slat = m.get("slat");
+        if (!(slat instanceof String s) || !SHUTTER_SLATS.contains(s)) {
+            c.err("$.shutter.slat", "aluminum veya pvc olmalı.");
+        }
+        Object drive = m.get("drive");
+        if (!(drive instanceof String d) || !SHUTTER_DRIVES.contains(d)) {
+            c.err("$.shutter.drive", "manual veya motor olmalı.");
+        }
+    }
+
+    private void validateExtras(Ctx c, Object extras) {
+        if (extras == null) return;
+        if (!(extras instanceof Map<?, ?> m)) {
+            c.err("$.extras", "Nesne olmalı.");
+            return;
+        }
+        Object sillOuter = m.get("sillOuter");
+        if (sillOuter != null && !(sillOuter instanceof Boolean)) {
+            c.err("$.extras.sillOuter", "Boolean olmalı.");
+        }
+        Object sillInner = m.get("sillInner");
+        if (sillInner != null && !(sillInner instanceof Boolean)) {
+            c.err("$.extras.sillInner", "Boolean olmalı.");
+        }
+        Object trim = m.get("trim");
+        if (trim != null && (!(trim instanceof String t) || !TRIM_OPTIONS.contains(t))) {
+            c.err("$.extras.trim", "none, three veya four olmalı.");
+        }
+        Object extension = m.get("extension");
+        if (extension == null) return;
+        if (!(extension instanceof Map<?, ?> em)) {
+            c.err("$.extras.extension", "Nesne olmalı.");
+            return;
+        }
+        for (String side : List.of("top", "left", "right", "bottom")) {
+            Object v = em.get(side);
+            if (v == null) continue;
+            if (!(v instanceof Number n) || n.doubleValue() < 0 || n.doubleValue() > 200 || Double.isNaN(n.doubleValue())) {
+                c.err("$.extras.extension." + side, "0-200 mm arası olmalı.");
+            }
+        }
     }
 
     private void node(Ctx c, Object raw, String path, int depth, String parentType, String coupleDir,

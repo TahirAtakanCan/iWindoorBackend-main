@@ -33,7 +33,10 @@ public record SeriesGeometryDto(
         double minDoorSashHeight,
         double maxDoorSashHeight,
         double couplingFace,
-        double couplingGap
+        double couplingGap,
+        double shutterBoxHeight,
+        double sillOverhang,
+        double trimWidth
 ) {
     public static SeriesGeometryDto of(Series s) {
         return new SeriesGeometryDto(String.valueOf(s.getId()), s.getFrameFaceMm(), s.getSashFaceMm(), s.getMullionFaceMm(),
@@ -45,6 +48,7 @@ public record SeriesGeometryDto(
                 s.getAdapterFaceMm(), s.getDoorSashFaceMm(), s.getThresholdFaceMm(), s.getThresholdEndAllowanceMm(),
                 s.getMinDoorSashWidthMm(), s.getMaxDoorSashWidthMm(),
                 s.getMinDoorSashHeightMm(), s.getMaxDoorSashHeightMm(),
-                s.getCouplingFaceMm(), s.getCouplingGapMm());
+                s.getCouplingFaceMm(), s.getCouplingGapMm(),
+                s.getShutterBoxHeightMm(), s.getSillOverhangMm(), s.getTrimWidthMm());
     }
 }

@@ -140,6 +140,9 @@ public class CatalogServiceImpl implements CatalogService {
         set(g.maxDoorSashHeight(), s::setMaxDoorSashHeightMm);
         set(g.couplingFace(), s::setCouplingFaceMm);
         set(g.couplingGap(), s::setCouplingGapMm);
+        set(g.shutterBoxHeight(), s::setShutterBoxHeightMm);
+        set(g.sillOverhang(), s::setSillOverhangMm);
+        set(g.trimWidth(), s::setTrimWidthMm);
     }
 
     private static void set(Double v, Consumer<Double> setter) {

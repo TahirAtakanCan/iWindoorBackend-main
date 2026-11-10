@@ -34,6 +34,9 @@ public record SeriesGeometryRequest(
         @Positive @DecimalMax("5000") Double minDoorSashHeight,
         @Positive @DecimalMax("10000") Double maxDoorSashHeight,
         @PositiveOrZero @DecimalMax("300") Double couplingFace,
-        @PositiveOrZero @DecimalMax("100") Double couplingGap
+        @PositiveOrZero @DecimalMax("100") Double couplingGap,
+        @PositiveOrZero @DecimalMax("500") Double shutterBoxHeight,
+        @PositiveOrZero @DecimalMax("200") Double sillOverhang,
+        @PositiveOrZero @DecimalMax("300") Double trimWidth
 ) {
 }

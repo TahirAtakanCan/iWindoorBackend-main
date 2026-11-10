@@ -56,6 +56,7 @@ public class DataSeeder implements CommandLineRunner {
             profile(s, "KN70-KAPI", "Kapı Kanadı 70", ProfileType.DOOR_SASH, 110, 260, null, null, true);
             profile(s, "ESIK-AL70", "Alüminyum Eşik 70", ProfileType.THRESHOLD, 20, 310, null, null, true);
             profile(s, "BRL70", "Birleştirme Profili 70", ProfileType.COUPLING, 20, 140, null, null, true);
+            profile(s, "GN70", "Kasa Genişletme 70", ProfileType.EXTENSION, 30, 95, null, null, true);
         } else {
             seriesRepository.findByCompanyIdIsNullOrderByIdAsc().stream()
                     .filter(s -> TEMPLATE_SERIES.equals(s.getName()))
@@ -65,6 +66,7 @@ public class DataSeeder implements CommandLineRunner {
                         ensureProfile(s, "ESIK-AL70", "Alüminyum Eşik 70", ProfileType.THRESHOLD, 20, 310, true);
                         ensureProfile(s, "AD70", "Çift Kanat Adaptörü 70", ProfileType.ADAPTER, 40, 120, true);
                         ensureProfile(s, "BRL70", "Birleştirme Profili 70", ProfileType.COUPLING, 20, 140, true);
+                        ensureProfile(s, "GN70", "Kasa Genişletme 70", ProfileType.EXTENSION, 30, 95, true);
                     });
         }
         glass("4+16+4", "Şeffaf Isıcam 4+16+4", 24, "clear", 650);
@@ -95,6 +97,16 @@ public class DataSeeder implements CommandLineRunner {
         accessory("SINEKLIK-SURME", "Sürme sineklik", AccessoryUnit.M2, 600);
         accessory("BUKUM", "Profil büküm (kemer)", AccessoryUnit.METER, 350);
         accessory("SEKILLI-CAM", "Şekilli cam farkı", AccessoryUnit.PIECE, 250);
+        accessory("PANJUR-LAMEL-AL", "Alüminyum panjur lameli", AccessoryUnit.M2, 1100);
+        accessory("PANJUR-LAMEL-PVC", "PVC panjur lameli", AccessoryUnit.M2, 700);
+        accessory("PANJUR-KUTU-MONO", "Monoblok panjur kutusu", AccessoryUnit.METER, 650);
+        accessory("PANJUR-KUTU-DIS", "Dıştan panjur kutusu", AccessoryUnit.METER, 550);
+        accessory("PANJUR-RAY", "Panjur yan rayı", AccessoryUnit.METER, 120);
+        accessory("PANJUR-MOTOR", "Panjur motoru", AccessoryUnit.PIECE, 2200);
+        accessory("PANJUR-KAYIS", "Panjur kayış/makara takımı", AccessoryUnit.SET, 450);
+        accessory("DENIZLIK-DIS", "Dış denizlik (alüminyum)", AccessoryUnit.METER, 280);
+        accessory("DENIZLIK-IC", "İç denizlik (PVC)", AccessoryUnit.METER, 180);
+        accessory("PERVAZ", "İç pervaz", AccessoryUnit.METER, 60);
 
         color("white", "Beyaz", "#F4F5F2", "#F4F5F2", 0, 10);
         color("CREAM", "Krem", "#EFE6D2", "#EFE6D2", 10, 20);

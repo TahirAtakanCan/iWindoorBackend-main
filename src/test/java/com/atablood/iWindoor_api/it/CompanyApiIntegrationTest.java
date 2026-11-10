@@ -58,7 +58,7 @@ class CompanyApiIntegrationTest {
              "sawKerfMm":4,"barTrimMm":10,"minOffcutMm":500,
              "glassSupplierName":null,"glassSupplierPhone":null,"glassSupplierEmail":null,"glassOrderNote":null,
              "pricingMode":"COST_PLUS","profitMarginPct":30,"laborPerM2":400,"installPerM2":250,"minBillableAreaM2":1.00,
-             "surveyGapMm":10,"screenMinAreaM2":0.50}""";
+             "surveyGapMm":10,"screenMinAreaM2":0.50,"shutterMinAreaM2":1.00}""";
 
     @Test
     void companyAdminCanUpdateDefaults_employeeForbidden() throws Exception {
@@ -116,7 +116,7 @@ class CompanyApiIntegrationTest {
                  "sawKerfMm":25,"barTrimMm":10,"minOffcutMm":500,
                  "glassSupplierName":null,"glassSupplierPhone":null,"glassSupplierEmail":null,"glassOrderNote":null,
                  "pricingMode":"COST_PLUS","profitMarginPct":30,"laborPerM2":400,"installPerM2":250,"minBillableAreaM2":1.00,
-                 "surveyGapMm":10,"screenMinAreaM2":0.50}""";
+                 "surveyGapMm":10,"screenMinAreaM2":0.50,"shutterMinAreaM2":1.00}""";
         call(put("/api/v1/company"), token, badKerf).andExpect(status().isBadRequest());
 
         String ok = """
@@ -126,7 +126,7 @@ class CompanyApiIntegrationTest {
                  "glassSupplierName":"Cam A.Ş.","glassSupplierPhone":"0555","glassSupplierEmail":"cam@test.com",
                  "glassOrderNote":"Isıcam çıtası gri",
                  "pricingMode":"COST_PLUS","profitMarginPct":30,"laborPerM2":400,"installPerM2":250,"minBillableAreaM2":1.00,
-                 "surveyGapMm":12,"screenMinAreaM2":0.50}""";
+                 "surveyGapMm":12,"screenMinAreaM2":0.50,"shutterMinAreaM2":1.00}""";
         call(put("/api/v1/company"), token, ok)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sawKerfMm").value(3.5))
