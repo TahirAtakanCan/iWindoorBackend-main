@@ -377,4 +377,47 @@ class BomPricerTest {
         assertThat(fixedBom.lines().get(0).code()).isEqualTo("CONTA-EPDM");
         assertThat(fixedBom.lines().get(0).quantity()).isEqualTo(6.0);
     }
+
+    @Test
+    void bentProfilesAndShapedGlassAddAccessories() {
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "BUKUM"))
+                .thenReturn(Optional.of(accessory("BUKUM", "Profil büküm (kemer)", AccessoryUnit.METER, 350)));
+        when(accessories.findFirstByCompanyIdAndCode(COMPANY, "SEKILLI-CAM"))
+                .thenReturn(Optional.of(accessory("SEKILLI-CAM", "Şekilli cam farkı", AccessoryUnit.PIECE, 250)));
+
+        Map<String, Object> frame = bar("PROFILE", "FRAME", 1576.8, 1);
+        frame.put("bent", true);
+        frame.put("radius", 500);
+        frame.put("cut", "45/31.7");
+        Map<String, Object> bead = bar("BEAD", null, 1376.0, 1);
+        bead.put("bent", true);
+        Map<String, Object> glass = new LinkedHashMap<>(Map.of(
+                "group", "GLASS", "glassCode", "4+16+4", "w", 904, "h", 1404, "qty", 1, "shape", "arch"));
+
+        PricedBom p = pricer.price(COMPANY, series, List.of(frame, bead, glass));
+        Map<String, QuoteLine> byCode = new HashMap<>();
+        for (QuoteLine l : p.lines()) byCode.put(l.code(), l);
+
+        assertThat(byCode.get("BUKUM").quantity()).isEqualTo(2.953);
+        assertThat(byCode.get("BUKUM").unit()).isEqualTo("m");
+        assertThat(byCode.get("BUKUM").total()).isEqualByComparingTo("1033.48");
+        assertThat(byCode.get("SEKILLI-CAM").quantity()).isEqualTo(1.0);
+        assertThat(byCode.get("SEKILLI-CAM").unit()).isEqualTo("adet");
+        assertThat(byCode.get("SEKILLI-CAM").total()).isEqualByComparingTo("250.00");
+        assertThat(byCode.get("4+16+4").total()).isEqualByComparingTo(
+                BigDecimal.valueOf(904 * 1404 / 1_000_000.0 * 650).setScale(2, java.math.RoundingMode.HALF_UP));
+    }
+
+    @Test
+    void acceptsAngledCutAndRejectsInvalidCut() {
+        Map<String, Object> ok = bar("PROFILE", "FRAME", 1000, 1);
+        ok.put("cut", "45/31.7");
+        assertThat(pricer.price(COMPANY, series, List.of(ok)).warnings()).isEmpty();
+
+        Map<String, Object> bad = bar("PROFILE", "FRAME", 1000, 1);
+        bad.put("cut", "45/abc");
+        assertThatThrownBy(() -> pricer.price(COMPANY, series, List.of(bad)))
+                .isInstanceOf(BadRequestException.class)
+                .satisfies(e -> assertThat(((BadRequestException) e).getCode()).isEqualTo("INVALID_BOM"));
+    }
 }

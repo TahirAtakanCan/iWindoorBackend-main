@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
+import java.util.regex.Pattern;
 
 /**
  * İstemcinin çizim motorundan gelen kesim listesini (BOM) katalog fiyatlarıyla çarpar.
@@ -27,15 +28,18 @@ public class BomPricer {
 
     public static final int MAX_LINES = 2000;
     public static final String DUPLEX_ACCESSORY_CODE = "DUPLEX";
+    public static final String BEND_ACCESSORY_CODE = "BUKUM";
+    public static final String SHAPED_GLASS_ACCESSORY_CODE = "SEKILLI-CAM";
     private static final Set<String> GROUPS = Set.of(
             "PROFILE", "BEAD", "DUPLEX", "GLASS", "PANEL", "HARDWARE", "COLOR", "SCREEN");
     private static final Set<String> ROLES = Set.of(
             "FRAME", "SASH", "MULLION", "SLIDE_SASH", "ADAPTER", "EXTENSION", "DOOR_SASH", "THRESHOLD", "COUPLING");
-    private static final Set<String> CUTS = Set.of("45/45", "90/90", "45/90");
+    private static final Pattern CUT_PATTERN = Pattern.compile("^\\d{1,3}(\\.\\d)?/\\d{1,3}(\\.\\d)?$");
     private static final Set<String> HARDWARE_KINDS = Set.of(
             "TURN", "TILT", "TILT_TURN", "SLIDE", "PASSIVE", "DOOR", "DOOR_PASSIVE",
             "SLIDE_FIXED", "LIFT_SLIDE");
     private static final Set<String> SCREEN_KINDS = Set.of("PLISE", "HINGED", "SLIDING");
+    private static final Set<String> GLASS_SHAPES = Set.of("arch", "segmentArch", "trapezoid", "triangle");
     private static final Map<String, String> SCREEN_CODES = Map.of(
             "PLISE", "SINEKLIK-PLISE",
             "HINGED", "SINEKLIK-MENTESELI",
@@ -75,8 +79,17 @@ public class BomPricer {
                         errors.add(err(p + ".role", "Şunlardan biri olmalı: " + new TreeSet<>(ROLES)));
                     }
                     Object cut = l.get("cut");
-                    if (cut != null && (!(cut instanceof String cs) || !CUTS.contains(cs))) {
-                        errors.add(err(p + ".cut", "Şunlardan biri olmalı: " + new TreeSet<>(CUTS)));
+                    if (cut != null && (!(cut instanceof String cs) || !CUT_PATTERN.matcher(cs).matches())) {
+                        errors.add(err(p + ".cut", "Biçim a/b olmalı (örn. 45/45, 45/31.7)."));
+                    }
+                    Object bent = l.get("bent");
+                    if (bent != null && !(bent instanceof Boolean)) {
+                        errors.add(err(p + ".bent", "Boolean olmalı."));
+                    }
+                    Object radius = l.get("radius");
+                    if (radius != null && (!(radius instanceof Number rn)
+                            || rn.doubleValue() < 50 || rn.doubleValue() > 20000 || Double.isNaN(rn.doubleValue()))) {
+                        errors.add(err(p + ".radius", "50-20000 mm arası olmalı."));
                     }
                 }
                 case "HARDWARE" -> {
@@ -107,6 +120,10 @@ public class BomPricer {
                     if (!(l.get("glassCode") instanceof String gc) || gc.isBlank()) {
                         errors.add(err(p + ".glassCode", "Cam/panel kodu gerekli."));
                     }
+                    Object shape = l.get("shape");
+                    if (shape != null && (!(shape instanceof String ss) || !GLASS_SHAPES.contains(ss))) {
+                        errors.add(err(p + ".shape", "Şunlardan biri olmalı: " + new TreeSet<>(GLASS_SHAPES)));
+                    }
                 }
             }
         }
@@ -120,6 +137,7 @@ public class BomPricer {
         Map<String, Acc> acc = new LinkedHashMap<>();
         String currency = "TRY";
         String colorCode = null;
+        double bentMeters = 0;
 
         for (Map<String, Object> l : bom == null ? List.<Map<String, Object>>of() : bom) {
             String group = (String) l.get("group");
@@ -143,6 +161,7 @@ public class BomPricer {
                     add(acc, group, pr == null ? role : pr.getCode(), pr == null ? role : pr.getName(), m, "m",
                             pr == null ? BigDecimal.ZERO : pr.getPricePerMeter());
                     if (pr != null && pr.getCurrency() != null) currency = pr.getCurrency();
+                    if (Boolean.TRUE.equals(l.get("bent"))) bentMeters += m;
                 }
                 case "BEAD" -> {
                     Glass g = r.glass((String) l.get("glassCode"));
@@ -151,6 +170,7 @@ public class BomPricer {
                     if (bead == null) warnings.add("Seride çıta (BEAD) profili yok.");
                     add(acc, group, bead == null ? "BEAD" : bead.getCode(), bead == null ? "Cam çıtası" : bead.getName(), m, "m",
                             bead == null ? BigDecimal.ZERO : bead.getPricePerMeter());
+                    if (Boolean.TRUE.equals(l.get("bent"))) bentMeters += m;
                 }
                 case "DUPLEX" -> {
                     Accessory a = r.accessory(DUPLEX_ACCESSORY_CODE);
@@ -171,7 +191,27 @@ public class BomPricer {
                     if (g == null) warnings.add("Katalogda cam/panel kodu yok: " + code);
                     add(acc, group, code, g == null ? code : g.getName(), m2, "m2",
                             g == null ? BigDecimal.ZERO : g.getPricePerSquareMeter());
+                    if (l.get("shape") instanceof String) {
+                        Accessory shaped = r.accessory(SHAPED_GLASS_ACCESSORY_CODE);
+                        if (shaped == null) {
+                            warnings.add("Aksesuar bulunamadı: " + SHAPED_GLASS_ACCESSORY_CODE);
+                            add(acc, "ACCESSORY", SHAPED_GLASS_ACCESSORY_CODE, "Şekilli cam farkı", qty, "adet",
+                                    BigDecimal.ZERO);
+                        } else {
+                            add(acc, "ACCESSORY", shaped.getCode(), shaped.getName(), qty, "adet", shaped.getPrice());
+                        }
+                    }
                 }
+            }
+        }
+
+        if (bentMeters > 0) {
+            Accessory bend = r.accessory(BEND_ACCESSORY_CODE);
+            if (bend == null) {
+                warnings.add("Aksesuar bulunamadı: " + BEND_ACCESSORY_CODE);
+                add(acc, "ACCESSORY", BEND_ACCESSORY_CODE, "Profil büküm (kemer)", bentMeters, "m", BigDecimal.ZERO);
+            } else {
+                add(acc, "ACCESSORY", bend.getCode(), bend.getName(), bentMeters, "m", bend.getPrice());
             }
         }
 

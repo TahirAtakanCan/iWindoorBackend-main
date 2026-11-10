@@ -22,6 +22,8 @@ public class DesignDocumentValidator {
     public static final Set<String> SCREENS = Set.of("plise", "hinged", "sliding");
     public static final Set<String> SLIDE_MOVES = Set.of("left", "right", "fixed");
     public static final Set<String> SLIDE_SYSTEMS = Set.of("standard", "liftSlide");
+    public static final Set<String> SHAPE_TYPES = Set.of("rect", "arch", "segmentArch", "trapezoid", "triangle");
+    public static final Set<String> TRIANGLE_APEX = Set.of("center", "left", "right");
 
     public void validateOrThrow(Map<String, Object> doc) {
         List<Map<String, String>> errors = validate(doc);
@@ -39,6 +41,8 @@ public class DesignDocumentValidator {
         Object v = doc.get("schemaVersion");
         if (!(v instanceof Number n) || !SUPPORTED_SCHEMA_VERSIONS.contains(n.intValue())) {
             c.err("$.schemaVersion", "Desteklenen sürüm: 1 veya 2");
+        } else {
+            c.schemaVersion = n.intValue();
         }
         number(c, doc, "width", "$", MIN_SIZE_MM, MAX_WIDTH_MM);
         number(c, doc, "height", "$", MIN_SIZE_MM, MAX_HEIGHT_MM);
@@ -60,6 +64,14 @@ public class DesignDocumentValidator {
         } else {
             if ("couple".equals(rm.get("type")) && bottom != null) {
                 c.err("$.bottom", "Birleşik doğrama kökünde bottom kullanılamaz.");
+            }
+            if (rm.containsKey("shape")) {
+                if ("couple".equals(rm.get("type"))) {
+                    c.err("$.root.shape", "Birleşik doğrama kökünde shape kullanılamaz.");
+                } else {
+                    requireSchema2ForShape(c);
+                    validateShape(c, rm, "$.root", designW, designH);
+                }
             }
             node(c, root, "$.root", 1, null, null, designW, designH);
         }
@@ -176,9 +188,85 @@ public class DesignDocumentValidator {
                 c.err(path + ".width", "Tasarım genişliğini aşamaz.");
             }
         }
+        if (m.containsKey("shape")) {
+            requireSchema2ForShape(c);
+            Double fw = numberOr(m.get("width"), designW);
+            Double fh = numberOr(m.get("height"), designH);
+            validateShape(c, m, path, fw, fh);
+        }
         Object child = m.get("child");
         if (child == null) c.err(path + ".child", "Eksik.");
         else node(c, child, path + ".child", depth + 1, "frame", null, designW, designH);
+    }
+
+    private void requireSchema2ForShape(Ctx c) {
+        if (c.schemaVersion < 2) {
+            c.err("$.schemaVersion", "Şekil için schemaVersion 2 gerekli.");
+        }
+    }
+
+    private void validateShape(Ctx c, Map<?, ?> m, String path, Double width, Double height) {
+        Object shape = m.get("shape");
+        if (!(shape instanceof Map<?, ?> sm)) {
+            c.err(path + ".shape", "Nesne olmalı.");
+            return;
+        }
+        Object type = sm.get("type");
+        if (!(type instanceof String st) || !SHAPE_TYPES.contains(st)) {
+            c.err(path + ".shape.type", "Şunlardan biri olmalı: " + new TreeSet<>(SHAPE_TYPES));
+            return;
+        }
+        switch (st) {
+            case "rect" -> { }
+            case "arch" -> {
+                if (width == null || height == null) return;
+                double r = width / 2.0;
+                if (height < r + 200) {
+                    c.err(path + ".shape", "Kemer yüksekliği en az yarıçap + 200 mm olmalı.");
+                }
+            }
+            case "segmentArch" -> {
+                Object rise = sm.get("rise");
+                if (!(rise instanceof Number rn) || Double.isNaN(rn.doubleValue())) {
+                    c.err(path + ".shape.rise", "Sayı olmalı.");
+                } else if (width != null) {
+                    double maxRise = width / 2.0;
+                    if (rn.doubleValue() < 50 || rn.doubleValue() > maxRise) {
+                        c.err(path + ".shape.rise", "50 ile genişlik/2 arasında olmalı.");
+                    }
+                }
+            }
+            case "trapezoid" -> {
+                Object lh = sm.get("leftHeight");
+                Object rh = sm.get("rightHeight");
+                if (!(lh instanceof Number ln) || ln.doubleValue() < 300) {
+                    c.err(path + ".shape.leftHeight", "En az 300 mm olmalı.");
+                }
+                if (!(rh instanceof Number rn) || rn.doubleValue() < 300) {
+                    c.err(path + ".shape.rightHeight", "En az 300 mm olmalı.");
+                }
+                if (lh instanceof Number ln2 && rh instanceof Number rn2 && height != null) {
+                    double maxSide = Math.max(ln2.doubleValue(), rn2.doubleValue());
+                    if (Math.abs(maxSide - height) > 0.01) {
+                        c.err(path + ".shape", "max(sol, sağ) yükseklik tasarım/kasa yüksekliğine eşit olmalı.");
+                    }
+                }
+            }
+            case "triangle" -> {
+                Object apex = sm.get("apex");
+                if (!(apex instanceof String a) || !TRIANGLE_APEX.contains(a)) {
+                    c.err(path + ".shape.apex", "center, left veya right olmalı.");
+                }
+                if (height != null && height < 300) {
+                    c.err(path + ".shape", "Üçgen yüksekliği en az 300 mm olmalı.");
+                }
+            }
+            default -> { }
+        }
+    }
+
+    private static Double numberOr(Object v, Double fallback) {
+        return v instanceof Number n && n.doubleValue() > 0 ? n.doubleValue() : fallback;
     }
 
     private void validateSplit(Ctx c, Map<?, ?> m, String path, int depth, Double designW, Double designH) {
@@ -334,6 +422,7 @@ public class DesignDocumentValidator {
         final List<Map<String, String>> errors = new ArrayList<>();
         final Set<String> ids = new HashSet<>();
         int nodes = 0;
+        int schemaVersion = 0;
 
         void err(String path, String message) {
             Map<String, String> e = new LinkedHashMap<>();

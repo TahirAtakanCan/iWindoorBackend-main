@@ -93,6 +93,8 @@ public class DataSeeder implements CommandLineRunner {
         accessory("SINEKLIK-PLISE", "Pileli sineklik", AccessoryUnit.M2, 950);
         accessory("SINEKLIK-MENTESELI", "Menteşeli sineklik", AccessoryUnit.M2, 700);
         accessory("SINEKLIK-SURME", "Sürme sineklik", AccessoryUnit.M2, 600);
+        accessory("BUKUM", "Profil büküm (kemer)", AccessoryUnit.METER, 350);
+        accessory("SEKILLI-CAM", "Şekilli cam farkı", AccessoryUnit.PIECE, 250);
 
         color("white", "Beyaz", "#F4F5F2", "#F4F5F2", 0, 10);
         color("CREAM", "Krem", "#EFE6D2", "#EFE6D2", 10, 20);

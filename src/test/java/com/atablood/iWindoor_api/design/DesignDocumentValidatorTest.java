@@ -137,6 +137,64 @@ class DesignDocumentValidatorTest {
     }
 
     @Test
+    void acceptsAndRejectsShapedWindows() {
+        Map<String, Object> archOk = sample();
+        archOk.put("schemaVersion", 2);
+        archOk.put("width", 1000);
+        archOk.put("height", 1500);
+        Map<String, Object> archRoot = leaf("arch");
+        archRoot.put("shape", Map.of("type", "arch"));
+        archOk.put("root", archRoot);
+        assertThat(validator.validate(archOk)).isEmpty();
+
+        Map<String, Object> archBad = sample();
+        archBad.put("schemaVersion", 2);
+        archBad.put("width", 1000);
+        archBad.put("height", 600);
+        Map<String, Object> archBadRoot = leaf("archBad");
+        archBadRoot.put("shape", Map.of("type", "arch"));
+        archBad.put("root", archBadRoot);
+        assertThat(validator.validate(archBad)).isNotEmpty();
+
+        Map<String, Object> segBad = sample();
+        segBad.put("schemaVersion", 2);
+        segBad.put("width", 1000);
+        segBad.put("height", 1500);
+        Map<String, Object> segRoot = leaf("seg");
+        segRoot.put("shape", Map.of("type", "segmentArch", "rise", 600));
+        segBad.put("root", segRoot);
+        assertThat(validator.validate(segBad)).isNotEmpty();
+
+        Map<String, Object> trapOk = sample();
+        trapOk.put("schemaVersion", 2);
+        trapOk.put("width", 1200);
+        trapOk.put("height", 1500);
+        Map<String, Object> trapRoot = leaf("trap");
+        trapRoot.put("shape", Map.of("type", "trapezoid", "leftHeight", 1500, "rightHeight", 1000));
+        trapOk.put("root", trapRoot);
+        assertThat(validator.validate(trapOk)).isEmpty();
+
+        Map<String, Object> trapBad = sample();
+        trapBad.put("schemaVersion", 2);
+        trapBad.put("width", 1200);
+        trapBad.put("height", 1400);
+        Map<String, Object> trapBadRoot = leaf("trapBad");
+        trapBadRoot.put("shape", Map.of("type", "trapezoid", "leftHeight", 1500, "rightHeight", 1000));
+        trapBad.put("root", trapBadRoot);
+        assertThat(validator.validate(trapBad)).isNotEmpty();
+
+        Map<String, Object> triBad = sample();
+        triBad.put("schemaVersion", 2);
+        triBad.put("width", 1000);
+        triBad.put("height", 1200);
+        Map<String, Object> triRoot = leaf("tri");
+        triRoot.put("shape", Map.of("type", "triangle", "apex", "top"));
+        triBad.put("root", triRoot);
+        assertThat(validator.validate(triBad).stream().map(e -> e.get("path")))
+                .contains("$.root.shape.apex");
+    }
+
+    @Test
     void acceptsNewSlidePanelsAndScreen() {
         Map<String, Object> panels = new LinkedHashMap<>(Map.of(
                 "id", "s1", "type", "slide", "system", "standard",
