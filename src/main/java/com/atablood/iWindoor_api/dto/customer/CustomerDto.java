@@ -20,16 +20,23 @@ public record CustomerDto(
         String note,
         Instant createdAt,
         List<CustomerProjectLine> projects,
-        BigDecimal totalBalance
+        BigDecimal totalBalance,
+        Integer projectCount
 ) {
     public static CustomerDto of(Customer c) {
         return new CustomerDto(c.getId(), c.getName(), c.getPhone(), c.getEmail(), c.getAddress(),
-                c.getTaxOffice(), c.getTaxNumber(), c.getNote(), c.getCreatedAt(), null, null);
+                c.getTaxOffice(), c.getTaxNumber(), c.getNote(), c.getCreatedAt(), null, null, null);
+    }
+
+    public static CustomerDto of(Customer c, int projectCount) {
+        return new CustomerDto(c.getId(), c.getName(), c.getPhone(), c.getEmail(), c.getAddress(),
+                c.getTaxOffice(), c.getTaxNumber(), c.getNote(), c.getCreatedAt(), null, null, projectCount);
     }
 
     public static CustomerDto of(Customer c, List<CustomerProjectLine> projects, BigDecimal totalBalance) {
         return new CustomerDto(c.getId(), c.getName(), c.getPhone(), c.getEmail(), c.getAddress(),
-                c.getTaxOffice(), c.getTaxNumber(), c.getNote(), c.getCreatedAt(), projects, totalBalance);
+                c.getTaxOffice(), c.getTaxNumber(), c.getNote(), c.getCreatedAt(), projects, totalBalance,
+                projects == null ? null : projects.size());
     }
 
     public record Request(

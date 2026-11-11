@@ -36,7 +36,14 @@ public class CustomerService {
         List<Customer> customers = (q == null || q.isBlank())
                 ? customerRepository.findByCompanyIdOrderByNameAscIdAsc(companyId)
                 : customerRepository.search(companyId, q.trim());
-        return customers.stream().map(CustomerDto::of).toList();
+        if (customers.isEmpty()) {
+            return List.of();
+        }
+        java.util.Map<Long, Integer> counts = new java.util.HashMap<>();
+        for (Object[] row : projectRepository.countByCustomerIds(customers.stream().map(Customer::getId).toList())) {
+            counts.put((Long) row[0], ((Number) row[1]).intValue());
+        }
+        return customers.stream().map(c -> CustomerDto.of(c, counts.getOrDefault(c.getId(), 0))).toList();
     }
 
     @Transactional(readOnly = true)

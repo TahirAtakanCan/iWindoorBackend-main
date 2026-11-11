@@ -25,6 +25,9 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
 
     boolean existsByCustomer_Id(Long customerId);
 
+    @Query("select p.customer.id, count(p) from Project p where p.customer.id in :ids group by p.customer.id")
+    List<Object[]> countByCustomerIds(@Param("ids") List<Long> ids);
+
     List<Project> findAllByCustomer_IdOrderByIdDesc(Long customerId);
 
     @Query("""
